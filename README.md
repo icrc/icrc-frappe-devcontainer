@@ -29,6 +29,7 @@ git config user.signingkey "key::$(ssh-add -L | head -1)"
 - [Telling Git about your signing key](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-ssh-key)
 - [Adding a new SSH key to your GitHub account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
 
+
 ## Licence
 
 GNU General Public License v3.0. See [LICENSE](LICENSE).
