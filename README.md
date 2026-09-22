@@ -9,7 +9,7 @@ Every commit here carries a verified signature. An unsigned commit is rejected a
 We sign with SSH, so the key you push with is the key you sign with.
 
 ```bash
-ssh-keygen -t ed25519 -a 100 -C "you@icrc.org"      # if you have no key
+ssh-keygen -t ed25519 -a 100 -C "you@yourmail.com"      # if you have no key
 git config --global gpg.format ssh
 git config --global user.signingkey ~/.ssh/id_ed25519.pub
 git config --global commit.gpgsign true
