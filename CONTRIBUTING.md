@@ -2,9 +2,9 @@
 
 This project is under construction. The layout, the scripts and their defaults can change without notice, and nothing here is a stable interface yet.
 
-Contributions are welcome, but open an issue before starting a pull request, so the work is not lost to a change already underway.
+Contributions are welcome as pull requests; issues are not enabled on this repository. Keep a pull request small and focused, so it is not lost to a change already underway.
 
-When you do send one:
+When you send one:
 
 - Commits are signed. [README.md](README.md#commits-must-be-signed) has the setup.
 - [AGENTS.md](AGENTS.md) holds the conventions for a change, for people and coding agents alike: pinned versions, no secret in a tracked file, no internal hostname.
