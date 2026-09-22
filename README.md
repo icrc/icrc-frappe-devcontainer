@@ -101,6 +101,19 @@ bash .devcontainer/init-env.sh --force   # rotate them
 
 Rotating invalidates the database the old password created. `init-env.sh --help` has the rest.
 
+## Git and GitHub
+
+- **git** uses the ssh key from your host's agent, which the editor forwards into the container. No key is copied in and `~/.ssh` is not mounted, so clone, pull and push over ssh (to GitHub or any other host) work as they do on your machine. The only prerequisite is on the host: an agent running with your key loaded (`ssh-add`) before you reopen in the container.
+- **gh** uses its own OAuth token, because an ssh key cannot authenticate an API call. Run `./gh-login.sh` once and approve the code in a browser; the token lands in the host's mounted `~/.config/gh`, so it survives every rebuild.
+
+An app cloned over https, like the default one in `apps.json`, can still push over ssh with one line in your host `~/.gitconfig`:
+
+```bash
+git config --global url."git@github.com:".pushInsteadOf "https://github.com/"
+```
+
+Check with `ssh -T git@github.com` and `gh auth status`. If ssh fails, confirm the agent arrived: `SSH_AUTH_SOCK` must be set and `ssh-add -L` must list your key.
+
 ## Commits must be signed
 
 Every commit here carries a verified signature. An unsigned commit is rejected at review, because a signature ties a change to a person rather than to a `user.email` string anyone can set.
