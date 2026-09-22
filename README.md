@@ -62,7 +62,7 @@ Nothing in this repository authenticates to a git host, which is what lets the s
   "branch": "main" }
 ```
 
-Keep private apps in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores. The ICRC Protection apps will live in [icrc-prot-ecosystem](https://github.com/icrc/icrc-prot-ecosystem); until that is published, list them there.
+A private repository on a public host can go in `apps.json`, provided everyone using this repository can reach it (a clone that fails stops `install-bench.sh`). Keep in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores, what must not be published: an internal host such as an on-premises Azure DevOps, and your personal additions. The ICRC Protection apps will live in [icrc-prot-ecosystem](https://github.com/icrc/icrc-prot-ecosystem); until that is published, list them there.
 
 ## The scripts
 

@@ -47,8 +47,8 @@ bench clones shallow, one commit deep, which is all a dependency needs. An
 app you develop on wants its history for log, blame and rebase: "history":
 true fetches it right after the clone.
 
-apps.local.json has the same shape and is gitignored. Private apps belong
-there, so a personal app list never turns into a commit.
+apps.local.json has the same shape and is gitignored. An internal host and
+your personal additions belong there, so neither turns into a public commit.
 
 Exit status: 0 when every app is present at the end, 1 on a bad argument or a
 malformed file, 2 when an app could not be fetched.
