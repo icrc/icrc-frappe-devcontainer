@@ -1,14 +1,19 @@
 # =============================================================================
 # Frappe dev container.
 #
-# The official frappe/bench image with the tooling this repository's scripts
-# need: zsh as the login shell, jq for apps.json, gh for pull requests, and a
-# terminal editor that does not have to be learned.
+# The official frappe/build image, the one a production image is built from,
+# with the tooling this repository's scripts need: zsh as the login shell, jq
+# for apps.json, gh for pull requests, and a terminal editor that does not have
+# to be learned.
 #
-# Every version is pinned. A floating base image means a rebuild is a different
-# container, which is the one thing a development environment must not be.
+# frappe/build carries bench and the Python and Node a Frappe release is built
+# with, so a bench created here runs on the same toolchain as the image that
+# ships it. FRAPPE_BUILD is the major line (v16): the newest v16 build on every
+# rebuild, never the next major. The Frappe version itself is pinned by
+# FRAPPE_VERSION in .env. Everything else is pinned to a release.
 # =============================================================================
-FROM docker.io/frappe/bench:v5.31.0
+ARG FRAPPE_BUILD=v16
+FROM docker.io/frappe/build:${FRAPPE_BUILD}
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
 
@@ -26,6 +31,7 @@ USER root
 #   micro     the editor EDITOR names below
 #   bat       syntax-highlighted cat, aliased in custom.zsh
 #   zstd      restoring a bench backup compressed with it
+#   iproute2  ss, which stop-bench.sh uses to find what holds a port
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     bat \
@@ -33,6 +39,7 @@ RUN apt-get update \
     curl \
     git \
     gnupg \
+    iproute2 \
     jq \
     less \
     lsb-release \
@@ -58,10 +65,17 @@ RUN arch="$(dpkg --print-architecture)" \
     && install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh \
     && rm -rf "/tmp/${tarball}" "/tmp/gh_${GH_VERSION}_linux_${arch}"
 
+# The workspace and the Claude config directory, created here so a volume
+# mounted over either arrives frappe-owned: Docker initialises a fresh volume
+# from the image content at its target, ownership included, and creates it
+# root-owned when that target is missing.
+RUN chsh -s /bin/zsh frappe \
+    && mkdir -p /workspace /home/frappe/.claude/plugins /home/frappe/.config/gh \
+    && chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config
+
 USER frappe
 
 ENV SHELL=/bin/zsh
-RUN sudo chsh -s /bin/zsh frappe
 
 ENV EDITOR=micro
 ENV VISUAL=micro
@@ -76,12 +90,5 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 COPY --chown=frappe:frappe zsh/custom.zsh /home/frappe/.zsh-custom.zsh
 RUN printf '\n# Frappe shortcuts\nsource /home/frappe/.zsh-custom.zsh\n' >> /home/frappe/.zshrc
-
-# The workspace and the Claude config directory, created here so a volume
-# mounted over either arrives frappe-owned: Docker initialises a fresh volume
-# from the image content at its target, ownership included, and creates it
-# root-owned when that target is missing.
-RUN mkdir -p /workspace /home/frappe/.claude/plugins /home/frappe/.config/gh \
-    && sudo chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config
 
 ENV CLAUDE_CONFIG_DIR=/home/frappe/.claude

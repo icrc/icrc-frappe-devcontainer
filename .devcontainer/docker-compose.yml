@@ -77,6 +77,10 @@ services:
   frappe:
     build:
       context: .
+      args:
+        # The frappe/build line the bench runs on. Written to .env by
+        # init-env.sh; the default here is the same major.
+        FRAPPE_BUILD: ${FRAPPE_BUILD:-v16}
     container_name: frappe-dev-container
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.
@@ -91,19 +95,45 @@ services:
       - "8000-8005:8000-8005"
       - "9000-9005:9000-9005"
 
-  # Identity provider, for testing OIDC login. Off by default because it is a
-  # second JVM and most work does not need it. `start-dev` runs against the
-  # embedded database over plain HTTP: development only.
-  # keycloak:
-  #   image: quay.io/keycloak/keycloak:26.7.3
-  #   container_name: frappe-keycloak
-  #   command: start-dev
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     KC_BOOTSTRAP_ADMIN_USERNAME: admin
-  #     KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD:?run .devcontainer/init-env.sh}
-  #     KC_HEALTH_ENABLED: "true"
+  # Identity provider, for OIDC login against the `frappe` realm. `start-dev`
+  # runs against the embedded database over plain HTTP: development only. The
+  # realm is imported on first start from keycloak-realm.json, rendered by
+  # init-env.sh with the client secret and the test user's password from .env;
+  # an existing realm is left alone on later starts. Admin console on
+  # http://localhost:8080, user admin.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.4
+    container_name: frappe-keycloak
+    command: start-dev --import-realm
+    ports:
+      - "8080:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD:?run .devcontainer/init-env.sh}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./keycloak-realm.json:/opt/keycloak/data/import/frappe-realm.json:ro
+
+  # One OpenAI-compatible endpoint in front of whichever model providers
+  # litellm-config.yaml lists. http://litellm:4000 from the bench. The provider
+  # keys are the empty lines init-env.sh leaves in .env for you to fill in; the
+  # config never holds one.
+  litellm:
+    image: ghcr.io/berriai/litellm:main-v1.83.7-stable
+    container_name: frappe-litellm
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?run .devcontainer/init-env.sh}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AZURE_API_KEY: ${AZURE_API_KEY:-}
+      AZURE_API_BASE: ${AZURE_API_BASE:-}
+      AZURE_API_VERSION: ${AZURE_API_VERSION:-}
 
 # Project-scoped, so a clean machine needs no `docker volume create` before the
 # first start.
@@ -111,3 +141,4 @@ volumes:
   mariadb-data:
   mailpit-data:
   seaweedfs-data:
+  keycloak-data:

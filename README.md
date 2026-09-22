@@ -1,6 +1,6 @@
 # icrc-frappe-devcontainer
 
-A dev container for Frappe: MariaDB, Redis, a mail catcher and an S3 store, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
+A dev container for Frappe: MariaDB, Redis, a mail catcher, an S3 store, Keycloak and a LiteLLM proxy, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
 
 ## Quick start
 
@@ -23,6 +23,15 @@ cd /workspace/development
 | Mail catcher | http://localhost:8025 |
 | S3 API | http://localhost:9100, `http://seaweedfs:8333` from inside |
 | MariaDB | `localhost:3306`, host `mariadb` from inside |
+| Keycloak | http://localhost:8080, `http://keycloak:8080` from inside. Admin `admin`, realm `frappe` with client `frappe` and user `dev` |
+| LiteLLM | http://localhost:4000, `http://litellm:4000` from inside. OpenAI-compatible, key `LITELLM_MASTER_KEY` |
+
+## Frappe versions
+
+Two pins, both in `.devcontainer/.env`, both written once by `init-env.sh`:
+
+- `FRAPPE_BUILD` (`v16`) is the [frappe/build](https://hub.docker.com/r/frappe/build/tags) line the container is built from, the image a production Frappe image is built from too, so the bench runs on the same Python and Node. A major, so a rebuild picks up its newest release and never the next major.
+- `FRAPPE_VERSION` (`v16.35.0`) is the exact Frappe release `install-bench.sh` installs. Set it to the one your production image is built from: edit `.env` before the first install, or `./switch-version.sh frappe v16.34.0` on a bench that exists, which migrates every site and rewrites `.env`.
 
 ## Choosing the apps
 
@@ -69,8 +78,7 @@ All in `development/`, all with `--help`, all aliased in the shell.
 | `build.sh` / `watch.sh` | `frbuild` / `frwatch` | Build assets once, or on change |
 | `clear-cache.sh` | `frcache` | Clear the cache when the browser shows an old build |
 | `console.sh` / `db-console.sh` | `frconsole` / `frdb` | A Python console, or a database shell |
-| `switch-frappe-version.sh` | | Move to another Frappe version and migrate every site |
-| `update-app.sh` | | The same for one app |
+| `switch-version.sh` | `frswitch` | Move an app, frappe included, to another tag or branch and migrate every site |
 | `s3-create-buckets.sh`, `s3-list-buckets.sh`, `s3-list-files.sh` | | The local object store |
 | `repo-status.sh` | `frstatus` | The git state of every app checkout, in one table |
 | `pr-sync.sh` | | Return an app to its default branch once its PR is merged |
@@ -80,7 +88,9 @@ Navigation: `godev`, `gobench`, `goapps`, `gosites`. Log tail: `logs`.
 
 ## Secrets
 
-`.devcontainer/init-env.sh` runs before the container starts and writes `.devcontainer/.env` with a random 32-character value per secret: the database root password, the Frappe Administrator password, and the object store keys. The file is git-ignored, it is never regenerated behind your back, and no default password exists anywhere in this repository.
+`.devcontainer/init-env.sh` runs before the container starts and writes `.devcontainer/.env` with a random 32-character value per secret: the database root password, the Frappe Administrator password, the object store keys, the Keycloak admin and test-user password, the Keycloak client secret and the LiteLLM master key. The file is git-ignored, it is never regenerated behind your back, and no default password exists anywhere in this repository.
+
+The model-provider keys LiteLLM needs (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, the `AZURE_*` three) are yours: `init-env.sh` leaves them empty in `.env`, and `litellm-config.yaml` says which model uses which. Fill in the ones you use and restart the `litellm` service.
 
 ```bash
 bash .devcontainer/init-env.sh --print   # show the current values
@@ -122,12 +132,12 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 | | Upstream | Here |
 |---|---|---|
-| Image | `frappe/bench:latest`, used as is | A build on top: zsh, `micro`, `gh`, `jq`, `bat`. Every image pinned |
+| Image | `frappe/bench:latest`, used as is | `frappe/build:v16`, the image production images are built from, plus zsh, `micro`, `gh`, `jq`, `bat`. Every other image pinned to a release |
 | Passwords | `123`, hardcoded in three places | Generated per install into `.env` |
 | Apps | `installer.py`, honoured only at `bench init` | `apps.json` + `get-apps.sh`, which works on an existing bench |
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |
 | Bench lifecycle | Nothing | The table above |
-| Services | MariaDB, Redis. Mailpit and Postgres commented out | MariaDB, Redis, Mailpit, S3. Keycloak commented out, Postgres dropped |
+| Services | MariaDB, Redis. Mailpit and Postgres commented out | MariaDB, Redis, Mailpit, S3, Keycloak with a dev realm imported, LiteLLM. Postgres dropped |
 | Credentials | Host `~/.ssh` bind-mounted | Host `~/.gitconfig` and `~/.config/gh` mounted, ssh through the forwarded agent |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
 | Claude Code | Nothing | Installed, with the host `~/.claude` shared |

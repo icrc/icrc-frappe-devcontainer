@@ -47,6 +47,14 @@ require_bench() {
         error_exit "$BENCH_DIR is not a Frappe bench: no sites/common_site_config.json."
 }
 
+# The sites in the bench, one per line, assets excluded.
+list_sites() {
+    local dir
+    for dir in "$BENCH_DIR"/sites/*/; do
+        [[ -f "$dir/site_config.json" ]] && basename "$dir"
+    done
+}
+
 require_secret() {
     local name="$1"
     [[ -n ${!name:-} ]] ||

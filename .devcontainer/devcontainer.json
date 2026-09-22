@@ -44,15 +44,14 @@
         "source=frappe-dev-cache,target=/home/frappe/.cache,type=volume",
         "source=frappe-dev-local,target=/home/frappe/.local,type=volume"
     ],
-    "remoteEnv": {
-        "CLAUDE_CONFIG_DIR": "/home/frappe/.claude"
-    },
     // Compose publishes these already; declaring them here is what gives them
     // a label in the editor's ports view.
     "forwardPorts": [
         8000,
         9000,
-        8025
+        8025,
+        8080,
+        4000
     ],
     "portsAttributes": {
         "8000-8005": {
@@ -71,6 +70,16 @@
         },
         "9100": {
             "label": "S3 API",
+            "onAutoForward": "silent"
+        },
+        "8080": {
+            "label": "Keycloak",
+            "protocol": "http",
+            "onAutoForward": "silent"
+        },
+        "4000": {
+            "label": "LiteLLM",
+            "protocol": "http",
             "onAutoForward": "silent"
         }
     },

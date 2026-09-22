@@ -18,8 +18,9 @@ Usage: install-bench.sh [VERSION]
 Initialise frappe-bench, install the apps from apps.json, and configure it for
 the MariaDB and Redis services in docker-compose.yml.
 
-  VERSION   the Frappe branch or tag, e.g. v16.16.0 or version-16.
-            Defaults to FRAPPE_VERSION from .devcontainer/.env
+  VERSION   the Frappe branch or tag, e.g. v16.35.0 or version-16.
+            Defaults to FRAPPE_VERSION from .devcontainer/.env, which is
+            where to pin the release your production image is built from
   -h        show this help
 
 An existing bench is not touched: the script asks before removing it. To add
@@ -36,7 +37,9 @@ case "${1:-}" in
     ;;
 esac
 
-FRAPPE_VERSION="${1:-${FRAPPE_VERSION:-v16.16.0}}"
+# .env is the one place the default is written, so no literal here.
+[[ -n ${1:-} ]] && FRAPPE_VERSION="$1"
+require_secret FRAPPE_VERSION
 
 log_info "Installing a Frappe bench (version $FRAPPE_VERSION)"
 

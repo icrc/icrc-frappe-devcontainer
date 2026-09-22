@@ -44,6 +44,6 @@ cd /workspace/development
 ## Conventions for a change here
 
 - A new script: `set -euo pipefail`, source `common.sh`, a `usage()` with a `--help` case, and `require_bench` / `require_secret` where they apply. Add it to the table in README.md and to `.devcontainer/zsh/custom.zsh` if it deserves an alias.
-- Pin every version you add: an image tag, a release tarball with its sha256, an app branch in `apps.json`. A floating version makes a rebuild a different container.
+- Pin every version you add: an image tag, a release tarball with its sha256, an app branch in `apps.json`. A floating version makes a rebuild a different container. The one deliberate exception is `FRAPPE_BUILD`, a major line, so the toolchain follows the Frappe release `FRAPPE_VERSION` pins; both live in `.devcontainer/.env` and nowhere else.
 - Check a shell change with `bash -n` at minimum. There is no test suite; the end-to-end check is a container rebuild, `install-bench.sh`, `create-site.sh`, `start.sh`, and the site loading.
 - Keep the divergence table in README.md current when you change something the upstream frappe_docker example does differently. That table is how anyone tells our decisions from theirs.

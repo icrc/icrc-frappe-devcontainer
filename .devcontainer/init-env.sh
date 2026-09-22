@@ -4,7 +4,8 @@
 #
 # Two jobs, both of which have to happen before the container is created:
 #
-#  1. .devcontainer/.env, with a freshly generated value for every secret.
+#  1. .devcontainer/.env, with a freshly generated value for every secret, the
+#     two Frappe pins, and an empty line per model-provider key for LiteLLM.
 #     Compose reads it when it creates the services, which is earlier than any
 #     hook running inside the container could write it.
 #  2. The bind-mount sources devcontainer.json declares. A bind mount whose
@@ -21,19 +22,30 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$HERE/.env"
 S3_TEMPLATE="$HERE/seaweedfs-s3.json.template"
 S3_CONFIG="$HERE/seaweedfs-s3.json"
+REALM_TEMPLATE="$HERE/keycloak-realm.json.template"
+REALM_CONFIG="$HERE/keycloak-realm.json"
 
-# Every secret this stack needs. FRAPPE_VERSION is not one, but it belongs to
-# the same file: switch-frappe-version.sh rewrites it there.
-SECRETS=(DB_ROOT_PASSWORD ADMIN_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY KEYCLOAK_PASSWORD)
-DEFAULT_FRAPPE_VERSION=v16.16.0
+# Every secret this stack needs, generated. The provider keys are yours, so
+# they are written empty, and LiteLLM simply has no model until one is filled.
+SECRETS=(DB_ROOT_PASSWORD ADMIN_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY
+    KEYCLOAK_PASSWORD KEYCLOAK_CLIENT_SECRET LITELLM_MASTER_KEY)
+PROVIDER_KEYS=(ANTHROPIC_API_KEY OPENAI_API_KEY AZURE_API_KEY AZURE_API_BASE AZURE_API_VERSION)
+
+# The two Frappe pins, the only place they are written. FRAPPE_BUILD is the
+# frappe/build line the container is built from, a major so a rebuild picks up
+# the newest v16 toolchain. FRAPPE_VERSION is the exact release install-bench.sh
+# installs: set it to the one your production image is built from.
+DEFAULT_FRAPPE_BUILD=v16
+DEFAULT_FRAPPE_VERSION=v16.35.0
 
 usage() {
     cat <<'EOF'
 Usage: init-env.sh [--force] [--print]
 
 Generate .devcontainer/.env with a random value per secret, render
-seaweedfs-s3.json from it, and create the host directories the container
-bind-mounts. Run automatically as the dev container's initializeCommand.
+seaweedfs-s3.json and keycloak-realm.json from it, and create the host
+directories the container bind-mounts. Run automatically as the dev
+container's initializeCommand.
 
   --force   replace an existing .env. The database created with the old
             password becomes unreachable
@@ -86,8 +98,18 @@ write_env() {
             echo "${name}=$(random_secret)"
         done
         echo ""
-        echo "# The Frappe version install-bench.sh installs. Changed by"
-        echo "# development/switch-frappe-version.sh."
+        echo "# Model-provider keys for LiteLLM. Fill in the ones you use, then"
+        echo "# restart the litellm service."
+        for name in "${PROVIDER_KEYS[@]}"; do
+            echo "${name}="
+        done
+        echo ""
+        echo "# The frappe/build line the container is built from (a rebuild"
+        echo "# picks up its newest release) and the exact Frappe release"
+        echo "# install-bench.sh installs. Align FRAPPE_VERSION with the one your"
+        echo "# production image is built from; switch-version.sh frappe VERSION"
+        echo "# rewrites it here."
+        echo "FRAPPE_BUILD=${DEFAULT_FRAPPE_BUILD}"
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
     } >"$tmp"
     chmod 600 "$tmp"
@@ -105,12 +127,25 @@ render_s3_config() {
         "$S3_TEMPLATE" >"$S3_CONFIG"
 }
 
+# Same for the Keycloak realm: the client secret and the test user's password
+# are placeholders in the template, so nothing in git holds a credential.
+render_realm_config() {
+    [[ -f $REALM_TEMPLATE ]] || return 0
+    local client_secret password
+    client_secret="$(grep -E '^KEYCLOAK_CLIENT_SECRET=' "$ENV_FILE" | cut -d= -f2-)"
+    password="$(grep -E '^KEYCLOAK_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
+    sed -e "s|__KEYCLOAK_CLIENT_SECRET__|${client_secret}|" -e "s|__KEYCLOAK_PASSWORD__|${password}|" \
+        "$REALM_TEMPLATE" >"$REALM_CONFIG"
+}
+
 if [[ $print_only == true ]]; then
     if [[ -f $ENV_FILE ]]; then
         cat "$ENV_FILE"
     else
         echo "# No .env yet. A run would generate:"
         for name in "${SECRETS[@]}"; do echo "${name}=$(random_secret)"; done
+        for name in "${PROVIDER_KEYS[@]}"; do echo "${name}="; done
+        echo "FRAPPE_BUILD=${DEFAULT_FRAPPE_BUILD}"
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
     fi
     exit 0
@@ -123,6 +158,7 @@ else
     echo "init-env.sh: wrote .devcontainer/.env with fresh secrets."
 fi
 render_s3_config
+render_realm_config
 
 # The bind-mount sources. ~/.gitconfig has to be a file, the other two
 # directories: Docker creates a root-owned directory for whichever is missing
