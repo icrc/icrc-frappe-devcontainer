@@ -45,6 +45,8 @@ Two pins, both in `.devcontainer/.env`, both written once by `init-env.sh`:
 
 Add an entry, run `./get-apps.sh`, and only the new app is fetched. `apps-example.json` holds a longer list to copy from.
 
+bench clones one commit deep, which is all a dependency needs. For an app you develop on, add `"history": true` to its entry and the full history is fetched right after the clone, so `git log`, `blame` and a rebase work in `frappe-bench/apps/<name>`. That checkout is a normal git repository on the declared branch: work from there, and `repo-status.sh` shows where each one stands.
+
 Nothing in this repository authenticates to a git host, which is what lets the same file reach any of them:
 
 ```jsonc

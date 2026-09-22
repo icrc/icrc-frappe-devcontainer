@@ -3,9 +3,10 @@
 # Install into the bench every app declared in apps.json.
 #
 # The file is a JSON array of {url, branch}, the shape `bench init --apps_path`
-# and frappe_docker's apps-example.json already use. Keeping it here rather
-# than in the code is what makes this repository reusable: the apps are
-# configuration, not part of the container.
+# and frappe_docker's apps-example.json already use, plus an optional
+# "history": true for an app developed here. Keeping it here rather than in
+# the code is what makes this repository reusable: the apps are configuration,
+# not part of the container.
 #
 # Why a script and not `bench init --apps_path`: bench honours that file only
 # when it creates the bench, so an app added afterwards never lands without
@@ -39,7 +40,12 @@ script is safe to re-run after adding an entry.
 
 apps.json is a JSON array:
 
-  [ { "url": "https://github.com/frappe/erpnext.git", "branch": "version-16" } ]
+  [ { "url": "https://github.com/frappe/erpnext.git", "branch": "version-16" },
+    { "url": "https://github.com/you/your_app.git", "branch": "main", "history": true } ]
+
+bench clones shallow, one commit deep, which is all a dependency needs. An
+app you develop on wants its history for log, blame and rebase: "history":
+true fetches it right after the clone.
 
 apps.local.json has the same shape and is gitignored. Private apps belong
 there, so a personal app list never turns into a commit.
@@ -87,7 +93,7 @@ read_entries() {
         [[ -n $file && -f $file ]] || continue
         jq -e 'type == "array"' "$file" >/dev/null 2>&1 ||
             error_exit "$file is not a JSON array of {url, branch}."
-        jq -r '.[] | [.url, (.branch // "")] | @tsv' "$file"
+        jq -r '.[] | [.url, (.branch // ""), (.history // false)] | @tsv' "$file"
     done
 }
 
@@ -109,7 +115,7 @@ entries="$(read_entries)"
 cd "$BENCH_DIR"
 
 failed=0
-while IFS=$'\t' read -r url branch; do
+while IFS=$'\t' read -r url branch history; do
     [[ -n $url ]] || continue
     app="$(app_name_from_url "$url")"
 
@@ -119,7 +125,7 @@ while IFS=$'\t' read -r url branch; do
     fi
 
     if [[ $dry_run == true ]]; then
-        log_info "would fetch $app from $url${branch:+ (branch $branch)}"
+        log_info "would fetch $app from $url${branch:+ (branch $branch)}$([[ $history == true ]] && echo ", with history")"
         continue
     fi
 
@@ -131,6 +137,10 @@ while IFS=$'\t' read -r url branch; do
     fi
 
     if [[ -d "apps/$app" ]]; then
+        if [[ $history == true && "$(git -C "apps/$app" rev-parse --is-shallow-repository)" == true ]]; then
+            log_info "Fetching the history of $app..."
+            git -C "apps/$app" fetch --unshallow || log_warn "  Could not fetch the history, the checkout is still usable."
+        fi
         log_info "$app installed."
     else
         log_error "$app was not installed. Check the URL, the branch, and that"
