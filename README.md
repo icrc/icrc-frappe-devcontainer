@@ -1,5 +1,7 @@
 # icrc-frappe-devcontainer
 
+> Under construction: things can change without notice. See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
 A dev container for Frappe: MariaDB, Redis, a mail catcher, an S3 store, Keycloak and a LiteLLM proxy, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
 
 ## Quick start
