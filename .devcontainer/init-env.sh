@@ -95,6 +95,11 @@ write_env() {
         echo "# Rotating invalidates the database created with the old password."
         echo ""
         for name in "${SECRETS[@]}"; do
+            if [[ $name == LITELLM_MASTER_KEY ]]; then
+                echo "# The API key a client sends to LiteLLM (http://litellm:4000 from"
+                echo "# the bench, http://localhost:4000 from the host), as"
+                echo "# \"Authorization: Bearer <key>\". Not a provider key."
+            fi
             echo "${name}=$(random_secret)"
         done
         echo ""

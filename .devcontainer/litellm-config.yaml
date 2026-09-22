@@ -5,8 +5,12 @@
 # No secret is written here: os.environ/NAME resolves at runtime from the
 # variables docker-compose.yml passes through, which come from .devcontainer/.env.
 #
-# Check once the stack is up, with LITELLM_MASTER_KEY from .env:
-#   curl http://localhost:4000/v1/models -H "Authorization: Bearer $LITELLM_MASTER_KEY"
+# Check once the stack is up, from the repository root on the host. The key is
+# LITELLM_MASTER_KEY, generated into .env; no shell has it exported, so it is
+# read from the file:
+#   curl http://localhost:4000/v1/models \
+#     -H "Authorization: Bearer $(grep '^LITELLM_MASTER_KEY=' .devcontainer/.env | cut -d= -f2)"
+# From the bench, use http://litellm:4000 and /workspace/.devcontainer/.env.
 #
 # model_name is the alias a client asks for; model is the provider identifier
 # and has to be one the provider currently serves.
