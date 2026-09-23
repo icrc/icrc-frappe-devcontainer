@@ -84,11 +84,13 @@ All in `development/`, all with `--help`, all aliased in the shell.
 | `console.sh` / `db-console.sh` | `frconsole` / `frdb` | A Python console, or a database shell |
 | `switch-version.sh` | `frswitch` | Move an app, frappe included, to another tag or branch and migrate every site |
 | `s3-create-buckets.sh`, `s3-list-buckets.sh`, `s3-list-files.sh` | | The local object store |
-| `repo-status.sh` | `frstatus` | The git state of every app checkout, in one table |
-| `pr-sync.sh` | | Return an app to its default branch once its PR is merged |
+| `repo-status.sh` | `frstatus`, `git repo-status` | The git state of every app checkout, in one table |
+| `pr-sync.sh` | `git pr-sync` | Return an app to its default branch once its PR is merged |
 | `gh-login.sh` | | Authenticate `gh`, once per host, with the device flow |
 
 Navigation: `godev`, `gobench`, `goapps`, `gosites`. Log tail: `logs`.
+
+The two git ones are git subcommands as well, completed by `git <TAB>`, so neither has to be remembered as a file name. Under that form the help is `-h`: git answers `--help` with a man page before the script runs.
 
 ## Secrets
 

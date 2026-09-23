@@ -92,3 +92,9 @@ COPY --chown=frappe:frappe zsh/custom.zsh /home/frappe/.zsh-custom.zsh
 RUN printf '\n# Frappe shortcuts\nsource /home/frappe/.zsh-custom.zsh\n' >> /home/frappe/.zshrc
 
 ENV CLAUDE_CONFIG_DIR=/home/frappe/.claude
+
+# development/ on PATH, so the git-* wrappers there answer as `git repo-status`
+# and `git pr-sync` in every shell, not only the interactive zsh that sources
+# custom.zsh. APPENDED, never prepended: the directory is a bind mount the
+# developer writes, and it must not shadow anything in /usr/local/bin.
+ENV PATH="${PATH}:/workspace/development"
