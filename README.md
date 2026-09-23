@@ -161,6 +161,8 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 ## Licence
 
-Copyright (C) 2026 International Committee of the Red Cross (ICRC).
+Copyright (C) 2026 International Committee of the Red Cross (ICRC), portions Copyright (c) 2017 Frappe Technologies Pvt. Ltd.
 
 GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+Portions derived from [frappe_docker](https://github.com/frappe/frappe_docker), Copyright (c) 2017 Frappe Technologies Pvt. Ltd., under the MIT licence. See [LICENSES/MIT-frappe_docker.txt](LICENSES/MIT-frappe_docker.txt).
