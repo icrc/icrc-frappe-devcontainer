@@ -161,4 +161,6 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 ## Licence
 
+Copyright (C) 2026 International Committee of the Red Cross (ICRC).
+
 GNU General Public License v3.0. See [LICENSE](LICENSE).
