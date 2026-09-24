@@ -1,0 +1,138 @@
+// Frappe dev container. The repository is mounted at /workspace by Compose and
+// the bench is built inside /workspace/development, which is why the workspace
+// folder is one level inside the mount.
+// Docs: https://containers.dev/implementors/json_reference/
+{
+    "name": "Frappe Bench",
+    "dockerComposeFile": "./docker-compose.yml",
+    "service": "frappe",
+    "workspaceFolder": "/workspace/development",
+    "remoteUser": "frappe",
+    "updateRemoteUserUID": false,
+    "shutdownAction": "stopCompose",
+    // Runs on the HOST before the container is created: generates
+    // .devcontainer/.env, renders seaweedfs-s3.json from it, and creates the
+    // bind-mount sources below so a host missing one of them still starts.
+    "initializeCommand": [
+        "bash",
+        ".devcontainer/init-env.sh"
+    ],
+    // Mounts -
+    //  * git identity and credentials: the host's ~/.gitconfig, so cloning a
+    //    private app works with whatever the host is already configured for.
+    //    No key or token is copied into the image.
+    //  * gh: the host's ~/.config/gh, so `gh auth login` is done once and
+    //    survives every rebuild.
+    //  * claude state: the host's ~/.claude, so login and settings are shared.
+    //  * claude plugins: a volume mounted OVER the shared ~/.claude above. The
+    //    files indexing the marketplace clones hold absolute paths, valid only
+    //    for the HOME that wrote them, so sharing them breaks every
+    //    environment but the one that started last. postStartCommand refills
+    //    it; the Dockerfile creates the target so it arrives frappe-owned.
+    //  * shell history, ~/.cache and ~/.local: volumes, so a rebuild does not
+    //    throw away history or a pip cache.
+    //
+    // ssh is deliberately absent: the host's agent is forwarded by the editor,
+    // which authenticates a git remote without a private key ever entering the
+    // container.
+    "mounts": [
+        "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/frappe/.gitconfig",
+        "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh,target=/home/frappe/.config/gh",
+        "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/frappe/.claude,consistency=cached",
+        "source=frappe-dev-claude-plugins,target=/home/frappe/.claude/plugins,type=volume",
+        "source=frappe-dev-history,target=/commandhistory,type=volume",
+        "source=frappe-dev-cache,target=/home/frappe/.cache,type=volume",
+        "source=frappe-dev-local,target=/home/frappe/.local,type=volume"
+    ],
+    // Compose publishes these already; declaring them here is what gives them
+    // a label in the editor's ports view.
+    "forwardPorts": [
+        8000,
+        9000,
+        8025,
+        8080,
+        4000
+    ],
+    "portsAttributes": {
+        "8000-8005": {
+            "label": "Frappe web",
+            "protocol": "http",
+            "onAutoForward": "notify"
+        },
+        "9000-9005": {
+            "label": "Frappe realtime",
+            "onAutoForward": "silent"
+        },
+        "8025": {
+            "label": "Mailpit",
+            "protocol": "http",
+            "onAutoForward": "silent"
+        },
+        "9100": {
+            "label": "S3 API",
+            "onAutoForward": "silent"
+        },
+        "8080": {
+            "label": "Keycloak",
+            "protocol": "http",
+            "onAutoForward": "silent"
+        },
+        "4000": {
+            "label": "LiteLLM",
+            "protocol": "http",
+            "onAutoForward": "silent"
+        }
+    },
+    "otherPortsAttributes": {
+        "onAutoForward": "ignore"
+    },
+    // pre-commit is upstream's one lifecycle command, kept. The Claude Code
+    // install is non-fatal: a container that comes up without it is still a
+    // working bench.
+    "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; uv tool install pre-commit || true",
+    // Fill the plugin volume mounted above, which starts empty on a rebuild.
+    // Idempotent and non-fatal, and runs after claude is installed.
+    "postStartCommand": "bash /workspace/.devcontainer/install-plugins.sh",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "remote.autoForwardPorts": false,
+                "sqltools.connections": [
+                    {
+                        "name": "MariaDB",
+                        "driver": "MariaDB",
+                        "server": "mariadb",
+                        "port": 3306,
+                        "username": "root",
+                        // From .devcontainer/.env, which is generated per
+                        // install: there is no password to hardcode here.
+                        "askForPassword": true,
+                        "database": "mysql",
+                        "previewLimit": 50
+                    }
+                ]
+            },
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "esbenp.prettier-vscode",
+                "vue.volar",
+                "mtxr.sqltools",
+                "mtxr.sqltools-driver-mysql",
+                "grapecity.gc-excelviewer",
+                "ms-vscode.live-server"
+            ]
+        },
+        "jetbrains": {
+            "plugins": [
+                "com.anthropic.code.plugin",
+                "PythonCore",
+                "Pythonid"
+            ],
+            "settings": {
+                "com.intellij:app:EditorSettings.soft_wrap_file_masks": "*.md; *.txt; *.rst; *.adoc"
+            }
+        }
+    }
+}
