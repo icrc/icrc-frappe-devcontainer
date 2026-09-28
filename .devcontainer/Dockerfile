@@ -40,10 +40,18 @@ USER root
 #   bat       syntax-highlighted cat, aliased in custom.zsh
 #   zstd      restoring a bench backup compressed with it
 #   iproute2  ss, which stop-bench.sh uses to find what holds a port
+#   fzf       loaded by the oh-my-zsh plugin below
 # build-essential, curl, git, less, sudo and wget are already in frappe/bench.
-RUN apt-get update \
+#
+# The slim base excludes /usr/share/doc/* from every package, and that is where
+# Debian ships fzf's key-bindings.zsh and completion.zsh, which the oh-my-zsh
+# plugin sources. dpkg reads dpkg.cfg.d/ in order and the last match wins, so
+# this file, sorting after `docker`, lets them back in.
+RUN printf 'path-include /usr/share/doc/fzf/*\n' > /etc/dpkg/dpkg.cfg.d/fzf \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
     bat \
+    fzf \
     gnupg \
     iproute2 \
     jq \
@@ -132,8 +140,8 @@ ENV BENCH_DEVELOPER=1
 ENV EDITOR=micro
 ENV VISUAL=micro
 
-# zsh with the powerlevel10k theme. `-p fzf` installs fzf and its own shell
-# integration, so nothing of fzf's is vendored into this repository.
+# zsh with the powerlevel10k theme. `-p fzf` only enables the oh-my-zsh plugin;
+# the fzf it loads is the Debian package installed above.
 RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v${ZSH_IN_DOCKER_VERSION}/zsh-in-docker.sh)" -- \
     -p git \
     -p fzf \

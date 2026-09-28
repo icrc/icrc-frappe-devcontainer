@@ -45,15 +45,9 @@
         "source=icrc-frappe-history,target=/commandhistory,type=volume",
         "source=icrc-frappe-cache,target=/home/frappe/.cache,type=volume"
     ],
-    // Compose publishes these already; declaring them here is what gives them
-    // a label in the editor's ports view.
-    "forwardPorts": [
-        8000,
-        9000,
-        8025,
-        8080,
-        4000
-    ],
+    // No forwardPorts: Compose publishes every port on the host already, and
+    // forwarding one as well makes the editor bind it a second time, which
+    // fails with "address already in use". These attributes only label them.
     "portsAttributes": {
         "8000-8005": {
             "label": "Frappe web",
