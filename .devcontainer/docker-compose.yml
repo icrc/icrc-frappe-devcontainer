@@ -3,14 +3,15 @@
 # default, so a missing .env stops the stack instead of quietly bringing up a
 # database everyone's password opens.
 #
-# A fixed project name keeps the named volumes attached to the same project
-# when the workspace-path hash changes.
+# The project name applies to a plain `docker compose up`. DevPod overrides it
+# with its own `--project-name`, whose hash changes between runs, so no service
+# sets container_name (a new project would clash with the containers the last
+# one left behind) and every volume below has a fixed name.
 name: frappe-dev
 
 services:
   mariadb:
     image: docker.io/mariadb:11.8
-    container_name: frappe-mariadb
     ports:
       - "3306:3306"
     command:
@@ -36,16 +37,13 @@ services:
 
   redis-cache:
     image: docker.io/redis:8.2-alpine
-    container_name: frappe-redis-cache
 
   redis-queue:
     image: docker.io/redis:8.2-alpine
-    container_name: frappe-redis-queue
 
   # Catches every mail the bench sends. Web UI on http://localhost:8025.
   mailpit:
     image: axllent/mailpit:v1.31.2
-    container_name: frappe-mailpit
     volumes:
       - mailpit-data:/data
     ports:
@@ -65,7 +63,6 @@ services:
   # .env, which is why it is gitignored rather than committed.
   seaweedfs:
     image: chrislusf/seaweedfs:3.99
-    container_name: frappe-seaweedfs
     command: server -s3 -s3.config=/etc/seaweedfs/s3.json -dir=/data -filer -filer.encryptVolumeData
     ports:
       - "9100:8333" # S3 API
@@ -77,12 +74,15 @@ services:
   frappe:
     build:
       context: .
+      # Always fetch frappe/bench:latest before building. A cached copy keeps
+      # its old pyenv and nvm, which do not know the FRAPPE_PYTHON and
+      # FRAPPE_NODE a newer .env pins.
+      pull: true
       args:
         # The default Python and Node of the bench, written to .env by
         # init-env.sh, the one place they are set.
         FRAPPE_PYTHON: ${FRAPPE_PYTHON:?run .devcontainer/init-env.sh}
         FRAPPE_NODE: ${FRAPPE_NODE:?run .devcontainer/init-env.sh}
-    container_name: frappe-dev-container
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.
     userns_mode: keep-id
@@ -104,7 +104,6 @@ services:
   # http://localhost:8080, user admin.
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.4
-    container_name: frappe-keycloak
     command: start-dev --import-realm
     ports:
       - "8080:8080"
@@ -122,7 +121,6 @@ services:
   # config never holds one.
   litellm:
     image: ghcr.io/berriai/litellm:main-v1.83.7-stable
-    container_name: frappe-litellm
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     ports:
       - "4000:4000"
@@ -136,10 +134,15 @@ services:
       AZURE_API_BASE: ${AZURE_API_BASE:-}
       AZURE_API_VERSION: ${AZURE_API_VERSION:-}
 
-# Project-scoped, so a clean machine needs no `docker volume create` before the
-# first start.
+# Named outright, so the data survives a change of project name; not external,
+# so a clean machine needs no `docker volume create` before the first start.
+# Compose warns when a later project picks one up; the warning is harmless.
 volumes:
   mariadb-data:
+    name: frappe-dev_mariadb-data
   mailpit-data:
+    name: frappe-dev_mailpit-data
   seaweedfs-data:
+    name: frappe-dev_seaweedfs-data
   keycloak-data:
+    name: frappe-dev_keycloak-data
