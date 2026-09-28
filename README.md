@@ -30,28 +30,41 @@ cd /workspace/development
 
 ## Frappe versions
 
-One pin, `FRAPPE_VERSION` in `.devcontainer/.env` (`v16.35.0`), written once by `init-env.sh`: the exact Frappe release `install-bench.sh` installs. Set it to the release your production image uses. Avoid a floating tag such as `v16`, which resolves to the newest v16 at install time.
+Three pins in `.devcontainer/.env`, written once by `init-env.sh`:
 
-The container is [frappe/bench](https://hub.docker.com/r/frappe/bench/tags)`:latest`, which Frappe rebuilds daily, so a rebuild brings the newest toolchain and an app meets a dependency upgrade here before production does. Through pyenv and nvm it carries the current Python and Node (3.14 and 24 today) as the default, and the previous ones (3.12 and 22), so a bench on either major line runs here.
+- `FRAPPE_VERSION` (`v16.35.0`), the exact Frappe release `install-bench.sh` installs. Set it to the release your production image uses. Avoid a floating tag such as `v16`, which resolves to the newest v16 at install time.
+- `FRAPPE_PYTHON` (`3.14.7`) and `FRAPPE_NODE` (`24.21.0`), the Python and Node [frappe/build](https://hub.docker.com/r/frappe/build/tags) carries at that tag, so the bench runs on the production toolchain. Read them with `docker run --rm --entrypoint sh frappe/build:v16.35.0 -c 'python --version; node --version'`.
 
-A rebuild can bring a newer Python patch release, which breaks the bench's virtualenv: it points at the old interpreter. Recreate it with `cd frappe-bench && bench migrate-env python3.14`.
+The container is [frappe/bench](https://hub.docker.com/r/frappe/bench/tags)`:latest`, which Frappe rebuilds daily, so a rebuild brings the newest tooling and an app meets a dependency upgrade here before production does. The Dockerfile installs the pinned Python and Node with its pyenv and nvm and makes them the default, so a rebuild never moves the interpreter the bench runs on. The Python and Node frappe/bench ships stay installed next to them.
+
+After changing `FRAPPE_PYTHON`, rebuild the container and recreate the bench's virtualenv on it: `cd frappe-bench && bench migrate-env python3.14`.
 
 ### Moving to another release on the same line
 
 ```bash
-./switch-version.sh frappe v16.36.0   # checks out, migrates every site, rewrites .env
+./switch-version.sh frappe v16.36.0   # checks out, migrates every site, rewrites FRAPPE_VERSION
 ```
 
-### Testing an upgrade to another major line
+If frappe/build at the new tag has another Python or Node, set `FRAPPE_PYTHON` and `FRAPPE_NODE` to match and rebuild.
 
-Do it on a second bench next to the first, so the old one stays usable. Every script takes the bench from `BENCH_NAME`, default `frappe-bench`, and `BENCH_PYTHON` picks the Python `install-bench.sh` creates it on. A bench on the previous line, v15:
+### Testing the next major line
+
+Do it on a second bench next to the first, so the current one stays usable. Every script takes the bench from `BENCH_NAME`, default `frappe-bench`, and `BENCH_PYTHON` picks the Python `install-bench.sh` creates it on.
+
+```bash
+BENCH_NAME=frappe-bench-v17 ./install-bench.sh version-17
+```
+
+If `frappe/build:version-17` has another Python or Node than the pins, add them for that bench first, until the next rebuild: `pyenv install 3.X.Y`, `nvm install N && nvm use N`, and `BENCH_PYTHON="$(pyenv root)/versions/3.X.Y/bin/python"`. Restore a backup into a site on the new bench, then run `BENCH_NAME=frappe-bench-v17 ./migrate-site.sh`. To move for good, set the three pins to the v17 release, rebuild, and `bench migrate-env` the bench.
+
+### A bench on the previous major line
+
+frappe/bench also ships the previous Python and Node (3.12 and 22 today):
 
 ```bash
 nvm use 22
 BENCH_NAME=frappe-bench-v15 BENCH_PYTHON=python3.12 ./install-bench.sh version-15
 ```
-
-Restore a backup into a site on the new bench, then run `BENCH_NAME=frappe-bench-v15 ./migrate-site.sh`. A major line newer than the Python frappe/bench carries waits for frappe/bench to catch up.
 
 Only one bench can serve on port 8000 at a time: `./stop-bench.sh` one before `./start.sh` on the other.
 

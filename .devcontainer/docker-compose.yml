@@ -77,6 +77,11 @@ services:
   frappe:
     build:
       context: .
+      args:
+        # The default Python and Node of the bench, written to .env by
+        # init-env.sh, the one place they are set.
+        FRAPPE_PYTHON: ${FRAPPE_PYTHON:?run .devcontainer/init-env.sh}
+        FRAPPE_NODE: ${FRAPPE_NODE:?run .devcontainer/init-env.sh}
     container_name: frappe-dev-container
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.

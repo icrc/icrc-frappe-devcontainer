@@ -5,7 +5,7 @@
 # Two jobs, both of which have to happen before the container is created:
 #
 #  1. .devcontainer/.env, with a freshly generated value for every secret, the
-#     Frappe pin, and an empty line per model-provider key for LiteLLM.
+#     Frappe pins, and an empty line per model-provider key for LiteLLM.
 #     Compose reads it when it creates the services, which is earlier than any
 #     hook running inside the container could write it.
 #  2. The bind-mount sources devcontainer.json declares. A bind mount whose
@@ -31,10 +31,14 @@ SECRETS=(DB_ROOT_PASSWORD ADMIN_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY
     KEYCLOAK_PASSWORD KEYCLOAK_CLIENT_SECRET LITELLM_MASTER_KEY)
 PROVIDER_KEYS=(ANTHROPIC_API_KEY OPENAI_API_KEY AZURE_API_KEY AZURE_API_BASE AZURE_API_VERSION)
 
-# The Frappe pin, the only place it is written: the exact release
-# install-bench.sh installs. Set it to the one your production image is built
-# from.
+# The Frappe pins, the only place they are written. FRAPPE_VERSION is the exact
+# release install-bench.sh installs: set it to the one your production image
+# is built from. FRAPPE_PYTHON and FRAPPE_NODE are the Python and Node
+# frappe/build carries at that tag, which the Dockerfile makes the default.
 DEFAULT_FRAPPE_VERSION=v16.35.0
+DEFAULT_FRAPPE_PYTHON=3.14.7
+DEFAULT_FRAPPE_NODE=24.21.0
+PINS=(FRAPPE_VERSION FRAPPE_PYTHON FRAPPE_NODE)
 
 usage() {
     cat <<'EOF'
@@ -107,13 +111,28 @@ write_env() {
             echo "${name}="
         done
         echo ""
-        echo "# The exact Frappe release install-bench.sh installs. Align it with"
-        echo "# the one your production image is built from; switch-version.sh"
-        echo "# frappe VERSION rewrites it here."
+        echo "# The exact Frappe release install-bench.sh installs, and the Python"
+        echo "# and Node frappe/build carries at that tag. Align them with your"
+        echo "# production image and rebuild the container; switch-version.sh"
+        echo "# frappe VERSION rewrites FRAPPE_VERSION here."
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
+        echo "FRAPPE_PYTHON=${DEFAULT_FRAPPE_PYTHON}"
+        echo "FRAPPE_NODE=${DEFAULT_FRAPPE_NODE}"
     } >"$tmp"
     chmod 600 "$tmp"
     mv "$tmp" "$ENV_FILE"
+}
+
+# An .env written before a pin existed lacks it, and Compose refuses to build
+# without it. Only the missing ones are appended; a value already set is kept.
+add_missing_pins() {
+    local name default
+    for name in "${PINS[@]}"; do
+        grep -qE "^${name}=" "$ENV_FILE" && continue
+        default="DEFAULT_${name}"
+        echo "${name}=${!default}" >>"$ENV_FILE"
+        echo "init-env.sh: added ${name}=${!default} to .devcontainer/.env."
+    done
 }
 
 # seaweedfs reads its identities from a JSON file, which Compose cannot
@@ -146,12 +165,15 @@ if [[ $print_only == true ]]; then
         for name in "${SECRETS[@]}"; do echo "${name}=$(random_secret)"; done
         for name in "${PROVIDER_KEYS[@]}"; do echo "${name}="; done
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
+        echo "FRAPPE_PYTHON=${DEFAULT_FRAPPE_PYTHON}"
+        echo "FRAPPE_NODE=${DEFAULT_FRAPPE_NODE}"
     fi
     exit 0
 fi
 
 if [[ -f $ENV_FILE && $force == false ]]; then
     echo "init-env.sh: .devcontainer/.env exists, left alone."
+    add_missing_pins
 else
     write_env
     echo "init-env.sh: wrote .devcontainer/.env with fresh secrets."

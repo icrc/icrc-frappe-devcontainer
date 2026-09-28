@@ -9,8 +9,9 @@
 # previous Python and Node, so a bench on either major line of Frappe runs
 # here. latest on purpose: Frappe rebuilds it daily, so a rebuild brings the
 # newest toolchain and an app meets a dependency upgrade in development first.
-# The Frappe version itself is pinned by FRAPPE_VERSION in .env. Everything
-# else is pinned to a release.
+# The Frappe version and the default Python and Node are pinned in .env, by
+# FRAPPE_VERSION, FRAPPE_PYTHON and FRAPPE_NODE. Everything else is pinned to
+# a release.
 # =============================================================================
 FROM docker.io/frappe/bench:latest
 
@@ -79,6 +80,25 @@ RUN chsh -s /bin/zsh frappe \
     && chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config
 
 USER frappe
+
+# The Python and Node the bench runs on, those of frappe/build at
+# FRAPPE_VERSION, installed next to the ones frappe/bench ships and made the
+# default. Pinned to the patch release, so a daily rebuild of latest never
+# moves the interpreter the bench's virtualenv points at. pyenv skips the
+# build when frappe/bench already has that exact release. The names are not
+# PYTHON_VERSION and NODE_VERSION: frappe/bench sets both with ENV, which
+# would silently win over a build arg of the same name.
+ARG FRAPPE_PYTHON
+ARG FRAPPE_NODE
+RUN pyenv install -s "${FRAPPE_PYTHON}" \
+    && PYENV_VERSION="${FRAPPE_PYTHON}" pip install --no-cache-dir virtualenv \
+    && pyenv global "${FRAPPE_PYTHON}" "${PYTHON_VERSION_PREV}" \
+    && . "${NVM_DIR}/nvm.sh" \
+    && nvm install "${FRAPPE_NODE}" \
+    && npm install -g yarn \
+    && nvm alias default "${FRAPPE_NODE}" \
+    && nvm use default \
+    && rm -rf "${NVM_DIR}/.cache"
 
 ENV SHELL=/bin/zsh
 
