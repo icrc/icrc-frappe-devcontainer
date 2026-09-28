@@ -35,7 +35,7 @@ cd /workspace/development
 
 **Run `./migrate-site.sh` after changing a DocType JSON.** Without it the column does not exist, the field never appears on the form, and the failure looks like a bug in the code.
 
-**Never write a secret into a tracked file.** Every password is generated into `.devcontainer/.env` by `init-env.sh` and read from the environment. There is no default password in this repository and no new one should appear: if a script needs a secret, add it to `SECRETS` in `init-env.sh` and read it through `require_secret` in `common.sh`.
+**Never write a secret into a tracked file.** Every password is generated into `.devcontainer/.env` by `init-env.sh` and read from the environment. There is no default password in this repository and no new one should appear: if a script needs a secret, add it to `SECRETS` in `init-env.sh` and read it through `require_secret` in `common.sh`. gitleaks enforces this, in a pre-commit hook and on every pull request; never answer a finding with `--no-verify` or a `gitleaks:allow` on a real secret.
 
 **No ICRC-internal hostname, URL, project name or address anywhere.** This repository is licensed for publication. An internal example goes in `apps.local.json`, which is git-ignored, or in a placeholder form such as `tfs.example.org`.
 

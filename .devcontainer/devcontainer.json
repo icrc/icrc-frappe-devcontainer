@@ -88,9 +88,11 @@
         "onAutoForward": "ignore"
     },
     // pre-commit is upstream's one lifecycle command, kept, and installed with
-    // pip because frappe/bench has no uv. Both installs are non-fatal: a
-    // container that comes up without them is still a working bench.
-    "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; python3 -m pip install --user --no-cache-dir pre-commit || true",
+    // pip because frappe/bench has no uv. `pre-commit install` then wires the
+    // gitleaks hook in .pre-commit-config.yaml into this repository. All of it
+    // is non-fatal: a container that comes up without them is still a working
+    // bench, and CI runs the same scan on every pull request.
+    "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; python3 -m pip install --user --no-cache-dir pre-commit && python3 -m pre_commit install || true",
     // Fill the plugin volume mounted above, which starts empty on a rebuild.
     // Idempotent and non-fatal, and runs after claude is installed.
     "postStartCommand": "bash /workspace/.devcontainer/install-plugins.sh",

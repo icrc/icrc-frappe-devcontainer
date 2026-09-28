@@ -148,6 +148,14 @@ bash .devcontainer/init-env.sh --force   # rotate them
 
 Rotating invalidates the database the old password created. `init-env.sh --help` has the rest.
 
+### Secret scanning
+
+[gitleaks](https://github.com/gitleaks/gitleaks) checks every commit twice. In the container, a pre-commit hook scans what is staged and refuses the commit on a finding. On GitHub, the `gitleaks` workflow scans the commits a pull request adds, so a commit made with `--no-verify` or outside the container is still caught. Both cover this repository only, not the app checkouts under `frappe-bench/apps/`.
+
+The hook is installed when the container is created. In a container created before it existed, run `pre-commit install` once. A false positive is silenced with a `gitleaks:allow` comment on the line, which a reviewer then sees.
+
+The workflow blocks a merge only once `gitleaks` is a required status check in the branch ruleset of `main`.
+
 ## Git and GitHub
 
 - **git** uses the ssh key from your host's agent, which the editor forwards into the container. No key is copied in and `~/.ssh` is not mounted, so clone, pull and push over ssh (to GitHub or any other host) work as they do on your machine. The only prerequisite is on the host: an agent running with your key loaded (`ssh-add`) before you reopen in the container.

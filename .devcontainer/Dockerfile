@@ -25,6 +25,14 @@ ARG GH_VERSION=2.101.0
 ARG GH_SHA256_AMD64=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8
 ARG GH_SHA256_ARM64=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f
 
+# gitleaks, which the pre-commit hook runs on every commit. Fetched the same
+# way as gh. The CI workflow in .github/workflows/gitleaks.yml reads these
+# three lines, so a bump here moves both. Digests from
+# https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_checksums.txt
+ARG GITLEAKS_VERSION=8.30.1
+ARG GITLEAKS_SHA256_AMD64=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+
 USER root
 
 #   jq        reads apps.json in get-apps.sh
@@ -59,6 +67,21 @@ RUN arch="$(dpkg --print-architecture)" \
     && tar -xzf "/tmp/${tarball}" -C /tmp \
     && install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh \
     && rm -rf "/tmp/${tarball}" "/tmp/gh_${GH_VERSION}_linux_${arch}"
+
+# gitleaks names its amd64 build x64.
+RUN arch="$(dpkg --print-architecture)" \
+    && case "${arch}" in \
+    amd64) asset=x64; sha="${GITLEAKS_SHA256_AMD64}" ;; \
+    arm64) asset=arm64; sha="${GITLEAKS_SHA256_ARM64}" ;; \
+    *) echo "gitleaks: unsupported architecture ${arch}" >&2; exit 1 ;; \
+    esac \
+    && tarball="gitleaks_${GITLEAKS_VERSION}_linux_${asset}.tar.gz" \
+    && curl -fsSL -o "/tmp/${tarball}" \
+    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
+    && echo "${sha}  /tmp/${tarball}" | sha256sum -c - \
+    && tar -xzf "/tmp/${tarball}" --no-same-owner -C /usr/local/bin gitleaks \
+    && chmod 0755 /usr/local/bin/gitleaks \
+    && rm -f "/tmp/${tarball}"
 
 # GitHub's host keys, system-wide, so the first clone over ssh does not stop at
 # a prompt. Scanned, then checked against the fingerprints GitHub publishes at
