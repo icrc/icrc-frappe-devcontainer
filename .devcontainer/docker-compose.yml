@@ -7,7 +7,7 @@
 # with its own `--project-name`, whose hash changes between runs, so no service
 # sets container_name (a new project would clash with the containers the last
 # one left behind) and every volume below has a fixed name.
-name: frappe-dev
+name: icrc-frappe
 
 services:
   mariadb:
@@ -139,10 +139,10 @@ services:
 # Compose warns when a later project picks one up; the warning is harmless.
 volumes:
   mariadb-data:
-    name: frappe-dev_mariadb-data
+    name: icrc-frappe_mariadb-data
   mailpit-data:
-    name: frappe-dev_mailpit-data
+    name: icrc-frappe_mailpit-data
   seaweedfs-data:
-    name: frappe-dev_seaweedfs-data
+    name: icrc-frappe_seaweedfs-data
   keycloak-data:
-    name: frappe-dev_keycloak-data
+    name: icrc-frappe_keycloak-data

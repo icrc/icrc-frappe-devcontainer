@@ -3,7 +3,7 @@
 // folder is one level inside the mount.
 // Docs: https://containers.dev/implementors/json_reference/
 {
-    "name": "Frappe Bench",
+    "name": "ICRC Frappe Bench",
     "dockerComposeFile": "./docker-compose.yml",
     "service": "frappe",
     "workspaceFolder": "/workspace/development",
@@ -41,9 +41,9 @@
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/home/frappe/.gitconfig",
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh,target=/home/frappe/.config/gh",
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/frappe/.claude,consistency=cached",
-        "source=frappe-dev-claude-plugins,target=/home/frappe/.claude/plugins,type=volume",
-        "source=frappe-dev-history,target=/commandhistory,type=volume",
-        "source=frappe-dev-cache,target=/home/frappe/.cache,type=volume"
+        "source=icrc-frappe-claude-plugins,target=/home/frappe/.claude/plugins,type=volume",
+        "source=icrc-frappe-history,target=/commandhistory,type=volume",
+        "source=icrc-frappe-cache,target=/home/frappe/.cache,type=volume"
     ],
     // Compose publishes these already; declaring them here is what gives them
     // a label in the editor's ports view.
