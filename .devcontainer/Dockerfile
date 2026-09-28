@@ -1,19 +1,18 @@
 # =============================================================================
 # Frappe dev container.
 #
-# The official frappe/build image, the one a production image is built from,
-# with the tooling this repository's scripts need: zsh as the login shell, jq
-# for apps.json, gh for pull requests, and a terminal editor that does not have
-# to be learned.
+# frappe/bench, the image frappe_docker develops on, with the tooling this
+# repository's scripts need: zsh as the login shell, jq for apps.json, gh for
+# pull requests, and a terminal editor that does not have to be learned.
 #
-# frappe/build carries bench and the Python and Node a Frappe release is built
-# with, so a bench created here runs on the same toolchain as the image that
-# ships it. FRAPPE_BUILD is the major line (v16): the newest v16 build on every
-# rebuild, never the next major. The Frappe version itself is pinned by
-# FRAPPE_VERSION in .env. Everything else is pinned to a release.
+# frappe/bench carries bench, and pyenv and nvm with the current and the
+# previous Python and Node, so a bench on either major line of Frappe runs
+# here. latest on purpose: Frappe rebuilds it daily, so a rebuild brings the
+# newest toolchain and an app meets a dependency upgrade in development first.
+# The Frappe version itself is pinned by FRAPPE_VERSION in .env. Everything
+# else is pinned to a release.
 # =============================================================================
-ARG FRAPPE_BUILD=v16
-FROM docker.io/frappe/build:${FRAPPE_BUILD}
+FROM docker.io/frappe/bench:latest
 
 ARG ZSH_IN_DOCKER_VERSION=1.2.1
 
@@ -32,21 +31,16 @@ USER root
 #   bat       syntax-highlighted cat, aliased in custom.zsh
 #   zstd      restoring a bench backup compressed with it
 #   iproute2  ss, which stop-bench.sh uses to find what holds a port
+# build-essential, curl, git, less, sudo and wget are already in frappe/bench.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     bat \
-    build-essential \
-    curl \
-    git \
     gnupg \
     iproute2 \
     jq \
-    less \
     lsb-release \
     micro \
     procps \
-    sudo \
-    wget \
     zsh \
     zstd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -65,6 +59,17 @@ RUN arch="$(dpkg --print-architecture)" \
     && install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh \
     && rm -rf "/tmp/${tarball}" "/tmp/gh_${GH_VERSION}_linux_${arch}"
 
+# GitHub's host keys, system-wide, so the first clone over ssh does not stop at
+# a prompt. Scanned, then checked against the fingerprints GitHub publishes at
+# https://api.github.com/meta: a key that does not match fails the build
+# rather than being trusted.
+ARG GITHUB_SSH_FINGERPRINTS="SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU SHA256:p2QAMXNIC1TJYWeIOttrVc98/R1BUFWu3/LiyKgUfQM SHA256:uNiVztksCsDhcc0u9e8BujQXVUpKZIDTMczCvj3tD2s"
+RUN ssh-keyscan -t ed25519,ecdsa,rsa github.com >/tmp/github.keys 2>/dev/null \
+    && ssh-keygen -lf /tmp/github.keys | awk '{print $2}' | sort >/tmp/github.scanned \
+    && printf '%s\n' ${GITHUB_SSH_FINGERPRINTS} | sort | diff - /tmp/github.scanned \
+    && cat /tmp/github.keys >>/etc/ssh/ssh_known_hosts \
+    && rm /tmp/github.keys /tmp/github.scanned
+
 # The workspace and the Claude config directory, created here so a volume
 # mounted over either arrives frappe-owned: Docker initialises a fresh volume
 # from the image content at its target, ownership included, and creates it
@@ -76,6 +81,10 @@ RUN chsh -s /bin/zsh frappe \
 USER frappe
 
 ENV SHELL=/bin/zsh
+
+# frappe/bench exports this from ~/.bashrc, which zsh never reads. Here it
+# reaches every process, the scripts in development/ included.
+ENV BENCH_DEVELOPER=1
 
 ENV EDITOR=micro
 ENV VISUAL=micro

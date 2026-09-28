@@ -22,7 +22,9 @@ error_exit() {
 
 DEV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$DEV_DIR")"
-BENCH_DIR="$DEV_DIR/frappe-bench"
+# BENCH_NAME picks a second bench next to the first, for an upgrade test.
+BENCH_NAME="${BENCH_NAME:-frappe-bench}"
+BENCH_DIR="$DEV_DIR/$BENCH_NAME"
 ENV_FILE="$REPO_DIR/.devcontainer/.env"
 
 # The secrets .devcontainer/init-env.sh generated on the host. Exported, so a
@@ -53,6 +55,18 @@ list_sites() {
     for dir in "$BENCH_DIR"/sites/*/; do
         [[ -f "$dir/site_config.json" ]] && basename "$dir"
     done
+}
+
+# Ask PROMPT and succeed on "yes". ASSUME_YES=true, which every script's -y
+# sets, answers for the user. With no terminal to ask, stop rather than hang.
+confirm() {
+    if [[ ${ASSUME_YES:-false} == true ]]; then
+        log_info "$1 yes (-y)"
+        return 0
+    fi
+    [[ -t 0 ]] || error_exit "No terminal to answer: $1 Re-run with -y."
+    read -p "$1 (yes/no): " -r
+    [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]
 }
 
 require_secret() {

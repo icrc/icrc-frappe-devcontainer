@@ -5,7 +5,7 @@
 # Two jobs, both of which have to happen before the container is created:
 #
 #  1. .devcontainer/.env, with a freshly generated value for every secret, the
-#     two Frappe pins, and an empty line per model-provider key for LiteLLM.
+#     Frappe pin, and an empty line per model-provider key for LiteLLM.
 #     Compose reads it when it creates the services, which is earlier than any
 #     hook running inside the container could write it.
 #  2. The bind-mount sources devcontainer.json declares. A bind mount whose
@@ -31,11 +31,9 @@ SECRETS=(DB_ROOT_PASSWORD ADMIN_PASSWORD S3_ACCESS_KEY S3_SECRET_KEY
     KEYCLOAK_PASSWORD KEYCLOAK_CLIENT_SECRET LITELLM_MASTER_KEY)
 PROVIDER_KEYS=(ANTHROPIC_API_KEY OPENAI_API_KEY AZURE_API_KEY AZURE_API_BASE AZURE_API_VERSION)
 
-# The two Frappe pins, the only place they are written. FRAPPE_BUILD is the
-# frappe/build line the container is built from, a major so a rebuild picks up
-# the newest v16 toolchain. FRAPPE_VERSION is the exact release install-bench.sh
-# installs: set it to the one your production image is built from.
-DEFAULT_FRAPPE_BUILD=v16
+# The Frappe pin, the only place it is written: the exact release
+# install-bench.sh installs. Set it to the one your production image is built
+# from.
 DEFAULT_FRAPPE_VERSION=v16.35.0
 
 usage() {
@@ -109,12 +107,9 @@ write_env() {
             echo "${name}="
         done
         echo ""
-        echo "# The frappe/build line the container is built from (a rebuild"
-        echo "# picks up its newest release) and the exact Frappe release"
-        echo "# install-bench.sh installs. Align FRAPPE_VERSION with the one your"
-        echo "# production image is built from; switch-version.sh frappe VERSION"
-        echo "# rewrites it here."
-        echo "FRAPPE_BUILD=${DEFAULT_FRAPPE_BUILD}"
+        echo "# The exact Frappe release install-bench.sh installs. Align it with"
+        echo "# the one your production image is built from; switch-version.sh"
+        echo "# frappe VERSION rewrites it here."
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
     } >"$tmp"
     chmod 600 "$tmp"
@@ -150,7 +145,6 @@ if [[ $print_only == true ]]; then
         echo "# No .env yet. A run would generate:"
         for name in "${SECRETS[@]}"; do echo "${name}=$(random_secret)"; done
         for name in "${PROVIDER_KEYS[@]}"; do echo "${name}="; done
-        echo "FRAPPE_BUILD=${DEFAULT_FRAPPE_BUILD}"
         echo "FRAPPE_VERSION=${DEFAULT_FRAPPE_VERSION}"
     fi
     exit 0

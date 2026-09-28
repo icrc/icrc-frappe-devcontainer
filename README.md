@@ -30,10 +30,36 @@ cd /workspace/development
 
 ## Frappe versions
 
-Two pins, both in `.devcontainer/.env`, both written once by `init-env.sh`:
+One pin, `FRAPPE_VERSION` in `.devcontainer/.env` (`v16.35.0`), written once by `init-env.sh`: the exact Frappe release `install-bench.sh` installs. Set it to the release your production image uses. Avoid a floating tag such as `v16`, which resolves to the newest v16 at install time.
 
-- `FRAPPE_BUILD` (`v16`) is the [frappe/build](https://hub.docker.com/r/frappe/build/tags) line the container is built from, the image a production Frappe image is built from too, so the bench runs on the same Python and Node. A major, so a rebuild picks up its newest release and never the next major.
-- `FRAPPE_VERSION` (`v16.35.0`) is the exact Frappe release `install-bench.sh` installs. Set it to the one your production image is built from: edit `.env` before the first install, or `./switch-version.sh frappe v16.34.0` on a bench that exists, which migrates every site and rewrites `.env`.
+The container is [frappe/bench](https://hub.docker.com/r/frappe/bench/tags)`:latest`, which Frappe rebuilds daily, so a rebuild brings the newest toolchain and an app meets a dependency upgrade here before production does. Through pyenv and nvm it carries the current Python and Node (3.14 and 24 today) as the default, and the previous ones (3.12 and 22), so a bench on either major line runs here.
+
+A rebuild can bring a newer Python patch release, which breaks the bench's virtualenv: it points at the old interpreter. Recreate it with `cd frappe-bench && bench migrate-env python3.14`.
+
+### Moving to another release on the same line
+
+```bash
+./switch-version.sh frappe v16.36.0   # checks out, migrates every site, rewrites .env
+```
+
+### Testing an upgrade to another major line
+
+Do it on a second bench next to the first, so the old one stays usable. Every script takes the bench from `BENCH_NAME`, default `frappe-bench`, and `BENCH_PYTHON` picks the Python `install-bench.sh` creates it on. A bench on the previous line, v15:
+
+```bash
+nvm use 22
+BENCH_NAME=frappe-bench-v15 BENCH_PYTHON=python3.12 ./install-bench.sh version-15
+```
+
+Restore a backup into a site on the new bench, then run `BENCH_NAME=frappe-bench-v15 ./migrate-site.sh`. A major line newer than the Python frappe/bench carries waits for frappe/bench to catch up.
+
+Only one bench can serve on port 8000 at a time: `./stop-bench.sh` one before `./start.sh` on the other.
+
+### Checking a bench against a production image
+
+`bench version -f table` lists each app with its version, branch and commit. In a production image only the version is left, because the image build removes every `.git`. The version comes from `__version__` in the app, so it tells two builds apart only when the app bumps it on every release. An app followed at a branch head, such as frappe/telephony at `0.0.1`, reads the same in every build.
+
+The fix belongs in the production image build, not here: stamp the commit into `__version__` before installing the app, as a PEP 440 local label, `0.0.1+g0123abc`. The `-` form (`0.0.1-0123abc`) is not valid PEP 440 and flit, the build backend Frappe apps use, refuses it. Parity is then the version in the image against the version and commit `bench version` shows here.
 
 ## Choosing the apps
 
@@ -91,6 +117,10 @@ All in `development/`, all with `--help`, all aliased in the shell.
 Navigation: `godev`, `gobench`, `goapps`, `gosites`. Log tail: `logs`.
 
 The two git ones are git subcommands as well, completed by `git <TAB>`, so neither has to be remembered as a file name. Under that form the help is `-h`: git answers `--help` with a man page before the script runs.
+
+## Adding a tool
+
+`sudo apt-get install PACKAGE` works in the container without a password: frappe/bench gives the `frappe` user sudo. What it installs lasts until the next rebuild. A tool the whole team needs goes in the apt list in `.devcontainer/Dockerfile` instead.
 
 ## Secrets
 
@@ -151,7 +181,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 | | Upstream | Here |
 |---|---|---|
-| Image | `frappe/bench:latest`, used as is | `frappe/build:v16`, the image production images are built from, plus zsh, `micro`, `gh`, `jq`, `bat`. Every other image pinned to a release |
+| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `jq`, `bat`. Every other image pinned to a release |
 | Passwords | `123`, hardcoded in three places | Generated per install into `.env` |
 | Apps | `installer.py`, honoured only at `bench init` | `apps.json` + `get-apps.sh`, which works on an existing bench |
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |

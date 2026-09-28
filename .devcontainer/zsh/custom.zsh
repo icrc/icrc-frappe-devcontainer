@@ -29,5 +29,13 @@ alias gd='git diff'
 alias gl='git log --oneline -10'
 alias gp='git pull'
 
+# pyenv's shell integration, which frappe/bench sets up in ~/.bashrc only. The
+# shims are already on PATH; this adds `pyenv shell` and the rehash.
+command -v pyenv >/dev/null && eval "$(pyenv init - zsh)"
+
+# nvm as a command, for a bench on the previous Node (`nvm use 22`). PATH
+# already carries the default Node, so nothing is switched here.
+[[ -s $NVM_DIR/nvm.sh ]] && source "$NVM_DIR/nvm.sh" --no-use
+
 alias logs="tail -f $BENCH_DIR/logs/bench-start.log"
 alias bat='batcat'

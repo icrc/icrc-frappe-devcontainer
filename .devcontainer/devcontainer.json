@@ -29,8 +29,10 @@
     //    for the HOME that wrote them, so sharing them breaks every
     //    environment but the one that started last. postStartCommand refills
     //    it; the Dockerfile creates the target so it arrives frappe-owned.
-    //  * shell history, ~/.cache and ~/.local: volumes, so a rebuild does not
-    //    throw away history or a pip cache.
+    //  * shell history and ~/.cache: volumes, so a rebuild does not throw
+    //    away history or a pip cache. ~/.local is deliberately not one:
+    //    frappe/bench installs bench there, and a volume would hide the
+    //    image's copy behind a stale one.
     //
     // ssh is deliberately absent: the host's agent is forwarded by the editor,
     // which authenticates a git remote without a private key ever entering the
@@ -41,8 +43,7 @@
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/frappe/.claude,consistency=cached",
         "source=frappe-dev-claude-plugins,target=/home/frappe/.claude/plugins,type=volume",
         "source=frappe-dev-history,target=/commandhistory,type=volume",
-        "source=frappe-dev-cache,target=/home/frappe/.cache,type=volume",
-        "source=frappe-dev-local,target=/home/frappe/.local,type=volume"
+        "source=frappe-dev-cache,target=/home/frappe/.cache,type=volume"
     ],
     // Compose publishes these already; declaring them here is what gives them
     // a label in the editor's ports view.
@@ -86,10 +87,10 @@
     "otherPortsAttributes": {
         "onAutoForward": "ignore"
     },
-    // pre-commit is upstream's one lifecycle command, kept. The Claude Code
-    // install is non-fatal: a container that comes up without it is still a
-    // working bench.
-    "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; uv tool install pre-commit || true",
+    // pre-commit is upstream's one lifecycle command, kept, and installed with
+    // pip because frappe/bench has no uv. Both installs are non-fatal: a
+    // container that comes up without them is still a working bench.
+    "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; python3 -m pip install --user --no-cache-dir pre-commit || true",
     // Fill the plugin volume mounted above, which starts empty on a rebuild.
     // Idempotent and non-fatal, and runs after claude is installed.
     "postStartCommand": "bash /workspace/.devcontainer/install-plugins.sh",

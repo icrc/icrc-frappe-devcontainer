@@ -87,7 +87,7 @@ fi
 
 repos=()
 git -C "$ROOT" rev-parse --is-inside-work-tree &>/dev/null && repos+=("$ROOT")
-APPS_DIR="${APPS_DIR:-$ROOT/development/frappe-bench/apps}"
+APPS_DIR="${APPS_DIR:-$ROOT/development/${BENCH_NAME:-frappe-bench}/apps}"
 if [[ -d "$APPS_DIR" ]]; then
     # -prune stops find descending into the .git directory it just matched.
     # Depth 2 is apps/<app>/.git and nothing deeper: an app's own vendored

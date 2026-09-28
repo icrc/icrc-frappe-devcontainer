@@ -8,22 +8,31 @@ source "$SCRIPT_DIR/common.sh"
 
 usage() {
     cat <<'EOF'
-Usage: delete-site.sh [SITE]
+Usage: delete-site.sh [-y] [SITE]
 
 Drop a site, its database and its files. Default dev.localhost. Asks for
 confirmation, and falls back to dropping the database directly when
 `bench drop-site` fails.
 
+  -y   delete without asking. Also --yes, --force
+
 Exit status: 0 on success or when cancelled, 1 when the site does not exist.
 EOF
 }
 
-case "${1:-}" in
--h | --help)
-    usage
-    exit 0
-    ;;
-esac
+ASSUME_YES=false
+args=()
+for arg in "$@"; do
+    case "$arg" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    -y | --yes | --force) ASSUME_YES=true ;;
+    *) args+=("$arg") ;;
+    esac
+done
+set -- "${args[@]}"
 
 SITE_NAME="${1:-dev.localhost}"
 
@@ -37,8 +46,7 @@ log_warn "========================================="
 log_warn "This permanently deletes:"
 log_warn "  sites/$SITE_NAME, its database, and every file in it"
 log_warn "========================================="
-read -p "Delete $SITE_NAME? Type 'Y' to confirm: " -r
-if [[ $REPLY != "Y" ]]; then
+if ! confirm "Delete $SITE_NAME?"; then
     log_info "Cancelled."
     exit 0
 fi

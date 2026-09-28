@@ -13,7 +13,7 @@ source "$SCRIPT_DIR/common.sh"
 
 usage() {
     cat <<'EOF'
-Usage: create-site.sh [SITE] [DB_NAME] [APP ...]
+Usage: create-site.sh [-y] [SITE] [DB_NAME] [APP ...]
 
 Create a Frappe site on the MariaDB service and install apps into it.
 
@@ -21,6 +21,8 @@ Create a Frappe site on the MariaDB service and install apps into it.
   DB_NAME   database name. Default derived from the site name
   APP ...   apps to install. Default every app in the bench except frappe,
             which is installed by definition
+  -y        drop and recreate SITE if it exists, without asking. Also
+            --yes, --force
   -h        show this help
 
 The Administrator password is ADMIN_PASSWORD from .devcontainer/.env and is
@@ -31,12 +33,19 @@ Exit status: 0 on success, 1 on a bad argument or a refusal, 2 on failure.
 EOF
 }
 
-case "${1:-}" in
--h | --help)
-    usage
-    exit 0
-    ;;
-esac
+ASSUME_YES=false
+args=()
+for arg in "$@"; do
+    case "$arg" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    -y | --yes | --force) ASSUME_YES=true ;;
+    *) args+=("$arg") ;;
+    esac
+done
+set -- "${args[@]}"
 
 SITE_NAME="${1:-dev.localhost}"
 DB_NAME="${2:-}"
@@ -62,8 +71,7 @@ fi
 
 if [[ -d "sites/$SITE_NAME" ]]; then
     log_error "Site $SITE_NAME already exists."
-    read -p "Drop and recreate it? Every row in it is lost. (yes/no): " -r
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    if confirm "Drop and recreate it? Every row in it is lost."; then
         bench drop-site "$SITE_NAME" --force \
             --db-root-username="$DB_ROOT_USER" \
             --db-root-password="$DB_ROOT_PASSWORD" || error_exit "Failed to drop $SITE_NAME"

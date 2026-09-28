@@ -17,29 +17,41 @@ source "$SCRIPT_DIR/common.sh"
 
 usage() {
     cat <<'EOF'
-Usage: switch-version.sh APP VERSION
+Usage: switch-version.sh [-y] APP VERSION
 
 Check out VERSION in apps/APP, update its dependencies, migrate every site
 and rebuild its assets. VERSION is a tag or a branch.
+
+  -y   stash uncommitted changes in apps/APP without asking. Also --yes,
+       --force
 
   switch-version.sh frappe v16.35.0    # the release the production image uses
   switch-version.sh raven v2.8.8
   switch-version.sh helpdesk develop
 
 With APP frappe, FRAPPE_VERSION in .devcontainer/.env is updated too.
+README.md, "Frappe versions", covers a move across a major line.
 
 Exit status: 0 on success, 1 on a bad argument or a refusal, 2 on failure.
 EOF
 }
 
+ASSUME_YES=false
+args=()
+for arg in "$@"; do
+    case "$arg" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    -y | --yes | --force) ASSUME_YES=true ;;
+    *) args+=("$arg") ;;
+    esac
+done
+set -- "${args[@]}"
+
 APP="${1:-}"
 NEW_VERSION="${2:-}"
-case "$APP" in
--h | --help)
-    usage
-    exit 0
-    ;;
-esac
 [[ -n $APP && -n $NEW_VERSION ]] || {
     usage >&2
     exit 1
@@ -62,8 +74,7 @@ fi
 if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     log_error "apps/$APP has uncommitted changes:"
     git status --short
-    read -p "Stash them and continue? (yes/no): " -r
-    if [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+    if confirm "Stash them and continue?"; then
         git stash push -m "before switching to $NEW_VERSION"
     else
         error_exit "Commit or stash them first."

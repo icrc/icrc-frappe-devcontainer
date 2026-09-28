@@ -77,10 +77,6 @@ services:
   frappe:
     build:
       context: .
-      args:
-        # The frappe/build line the bench runs on. Written to .env by
-        # init-env.sh; the default here is the same major.
-        FRAPPE_BUILD: ${FRAPPE_BUILD:-v16}
     container_name: frappe-dev-container
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.

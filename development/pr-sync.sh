@@ -92,7 +92,7 @@ worktree_state() { # repo -> clean, or a summary
 collect_repos() {
     local repos=()
     git -C "$ROOT" rev-parse --is-inside-work-tree &>/dev/null && repos+=("$ROOT")
-    local apps_dir="${APPS_DIR:-$ROOT/development/frappe-bench/apps}"
+    local apps_dir="${APPS_DIR:-$ROOT/development/${BENCH_NAME:-frappe-bench}/apps}"
     if [[ -d "$apps_dir" ]]; then
         # Same walk as repo-status.sh.
         while IFS= read -r gitdir; do
