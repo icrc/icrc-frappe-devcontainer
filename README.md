@@ -174,11 +174,11 @@ Rotating invalidates the database the old password created. `init-env.sh --help`
 
 ### Secret scanning
 
-[gitleaks](https://github.com/gitleaks/gitleaks) checks every commit twice. In the container, a pre-commit hook scans what is staged and refuses the commit on a finding. On GitHub, the `gitleaks` workflow scans the commits a pull request adds, so a commit made with `--no-verify` or outside the container is still caught. Both cover this repository only, not the app checkouts under `frappe-bench/apps/`.
+[betterleaks](https://github.com/betterleaks/betterleaks), the successor to gitleaks by the same author, checks every commit twice. In the container, a pre-commit hook scans what is staged and refuses the commit on a finding. On GitHub, the `betterleaks` workflow scans the commits a pull request adds, so a commit made with `--no-verify` or outside the container is still caught. Both cover this repository only, not the app checkouts under `frappe-bench/apps/`.
 
-The hook is installed when the container is created. In a container created before it existed, run `pre-commit install` once. A false positive is silenced with a `gitleaks:allow` comment on the line, which a reviewer then sees.
+The hook is installed when the container is created. In a container created before it existed, run `pre-commit install` once. A false positive is silenced with a `betterleaks:allow` comment on the line, which a reviewer then sees; `gitleaks:allow` is still honoured. A false positive already committed, which no comment can reach, is listed by fingerprint in `.betterleaksignore`.
 
-The workflow blocks a merge only once `gitleaks` is a required status check in the branch ruleset of `main`.
+The workflow blocks a merge only once `betterleaks` is a required status check in the branch ruleset of `main`.
 
 ## Git and GitHub
 

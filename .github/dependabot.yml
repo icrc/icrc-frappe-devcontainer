@@ -2,7 +2,7 @@
 # GitHub Actions the workflows use. Image minor and patch bumps arrive as one
 # pull request, a major one on its own, except MariaDB, which never gets one.
 #
-# The Dockerfile is left out: its FROM tag, GH_VERSION, GITLEAKS_VERSION and
+# The Dockerfile is left out: its FROM tag, GH_VERSION, BETTERLEAKS_VERSION and
 # ZSH_IN_DOCKER_VERSION are build args, which Dependabot does not resolve.
 # Docs: https://docs.github.com/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 version: 2

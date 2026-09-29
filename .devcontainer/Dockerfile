@@ -25,13 +25,15 @@ ARG GH_VERSION=2.101.0
 ARG GH_SHA256_AMD64=9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8
 ARG GH_SHA256_ARM64=b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f
 
-# gitleaks, which the pre-commit hook runs on every commit. Fetched the same
-# way as gh. The CI workflow in .github/workflows/gitleaks.yml reads these
-# three lines, so a bump here moves both. Digests from
-# https://github.com/gitleaks/gitleaks/releases/download/v<version>/gitleaks_<version>_checksums.txt
-ARG GITLEAKS_VERSION=8.30.1
-ARG GITLEAKS_SHA256_AMD64=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
-ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
+# betterleaks, which the pre-commit hook runs on every commit. The successor to
+# gitleaks, by the same author, which now takes security patches only; it reads
+# the same config and gitleaks:allow comments. Fetched the same way as gh. The
+# CI workflow in .github/workflows/betterleaks.yml reads these three lines, so
+# a bump here moves both. Digests from
+# https://github.com/betterleaks/betterleaks/releases/download/v<version>/checksums.txt
+ARG BETTERLEAKS_VERSION=1.8.1
+ARG BETTERLEAKS_SHA256_AMD64=efa407244e1ea8e35f582b8a42becdeac08bdead04f68eb752adda722d583c2a
+ARG BETTERLEAKS_SHA256_ARM64=bbb578b12a2f65d7082ab436abf37724232bc71d8a078e3c41336574420f1b48
 
 # lazygit, a terminal UI for git, aliased `lg` in custom.zsh. Fetched the same
 # way as gh. Digests from
@@ -83,19 +85,19 @@ RUN arch="$(dpkg --print-architecture)" \
     && install -m 0755 "/tmp/gh_${GH_VERSION}_linux_${arch}/bin/gh" /usr/local/bin/gh \
     && rm -rf "/tmp/${tarball}" "/tmp/gh_${GH_VERSION}_linux_${arch}"
 
-# gitleaks names its amd64 build x64.
+# betterleaks names its amd64 build x64.
 RUN arch="$(dpkg --print-architecture)" \
     && case "${arch}" in \
-    amd64) asset=x64; sha="${GITLEAKS_SHA256_AMD64}" ;; \
-    arm64) asset=arm64; sha="${GITLEAKS_SHA256_ARM64}" ;; \
-    *) echo "gitleaks: unsupported architecture ${arch}" >&2; exit 1 ;; \
+    amd64) asset=x64; sha="${BETTERLEAKS_SHA256_AMD64}" ;; \
+    arm64) asset=arm64; sha="${BETTERLEAKS_SHA256_ARM64}" ;; \
+    *) echo "betterleaks: unsupported architecture ${arch}" >&2; exit 1 ;; \
     esac \
-    && tarball="gitleaks_${GITLEAKS_VERSION}_linux_${asset}.tar.gz" \
+    && tarball="betterleaks_${BETTERLEAKS_VERSION}_linux_${asset}.tar.gz" \
     && curl -fsSL -o "/tmp/${tarball}" \
-    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}" \
+    "https://github.com/betterleaks/betterleaks/releases/download/v${BETTERLEAKS_VERSION}/${tarball}" \
     && echo "${sha}  /tmp/${tarball}" | sha256sum -c - \
-    && tar -xzf "/tmp/${tarball}" --no-same-owner -C /usr/local/bin gitleaks \
-    && chmod 0755 /usr/local/bin/gitleaks \
+    && tar -xzf "/tmp/${tarball}" --no-same-owner -C /usr/local/bin betterleaks \
+    && chmod 0755 /usr/local/bin/betterleaks \
     && rm -f "/tmp/${tarball}"
 
 # lazygit names its amd64 build x86_64.

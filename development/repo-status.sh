@@ -122,7 +122,7 @@ tree_label() { # conflicts staged unstaged untracked
     printf '%s' "${s% }"
 }
 
-# A clone URL can carry credentials as userinfo (https://user:token@host/...).
+# A clone URL can carry credentials as userinfo (https://user:<token>@host/...).
 # Strip it before printing: the URL is context, the token is a secret.
 scrub_url() { printf '%s' "$1" | sed 's#://[^/@]*@#://#'; }
 
