@@ -9,10 +9,10 @@
 # one left behind) and every volume below has a fixed name.
 name: icrc-frappe
 
-# The proxy, from the host: the variables exported in the shell that opens the
-# container, else the same names in .env. Nothing set means every value is
-# empty, which curl, pip, npm and Python all read as no proxy, so one file
-# serves a network with a proxy and one without. NO_PROXY keeps the services
+# The runtime proxy, from the host: the variables exported in the shell that
+# opens the container, else the same names in .env. Nothing set means every
+# value is empty, which curl, pip, npm and Python all read as no proxy, so one
+# file serves a network with a proxy and one without. NO_PROXY keeps the services
 # below off the proxy and appends the host's own list, which is where an
 # internal domain belongs: none is written here.
 x-proxy-env: &proxy-env
@@ -97,9 +97,10 @@ services:
         # init-env.sh, the one place they are set.
         FRAPPE_PYTHON: ${FRAPPE_PYTHON:?run .devcontainer/init-env.sh}
         FRAPPE_NODE: ${FRAPPE_NODE:?run .devcontainer/init-env.sh}
-        # Docker's predefined proxy args: every RUN sees them without an ARG,
-        # and none is kept in the image, so nothing has to reset them.
-        <<: *proxy-env
+        # No proxy here: the build takes it from devcontainer.json, as
+        # diop-forge does. Rootless Podman runs the RUN steps in the host's
+        # network, where a container-only address such as
+        # host.containers.internal has no route.
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.
     userns_mode: keep-id

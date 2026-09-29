@@ -10,6 +10,14 @@
     "remoteUser": "frappe",
     "updateRemoteUserUID": false,
     "shutdownAction": "stopCompose",
+    // Build - proxy args come from the host shell, never hardcoded here. The
+    // image itself is built by docker-compose.yml, which passes no proxy.
+    "build": {
+        "args": {
+            "HTTP_PROXY": "${localEnv:HTTP_PROXY}",
+            "HTTPS_PROXY": "${localEnv:HTTPS_PROXY}"
+        }
+    },
     // Runs on the HOST before the container is created: generates
     // .devcontainer/.env, renders seaweedfs-s3.json from it, copies the host's
     // ~/.gitconfig, ~/.ssh/allowed_signers and ~/.npmrc next to it, and
@@ -46,9 +54,9 @@
     //
     // ssh keys are deliberately absent, the public allowed_signers list aside:
     // the host's agent is forwarded by the editor, which authenticates a git
-    // remote without a private key ever entering the container. The proxy is
-    // not here either: docker-compose.yml passes it, to the build and to every
-    // process in the container, not only to an editor session.
+    // remote without a private key ever entering the container. The runtime
+    // proxy is not here either: docker-compose.yml passes it to every process
+    // in the container, not only to an editor session.
     "mounts": [
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh,target=/home/frappe/.config/gh",
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/frappe/.claude,consistency=cached",

@@ -46,7 +46,7 @@ export HTTPS_PROXY=http://proxy.example.org:8080
 export NO_PROXY=localhost,127.0.0.1,.example.org
 ```
 
-Compose passes them to the image build and to the `frappe` and `litellm` containers, and adds its own service names to `NO_PROXY`, so the bench reaches MariaDB, Keycloak or LiteLLM directly. Put your internal domains in the host's `NO_PROXY`, never in a tracked file. An editor started from a desktop menu may not see the shell's variables; the same three lines, without `export`, in `.devcontainer/.env` are read as a fallback.
+Compose passes them to the `frappe` and `litellm` containers, and adds its own service names to `NO_PROXY`, so the bench reaches MariaDB, Keycloak or LiteLLM directly. Put your internal domains in the host's `NO_PROXY`, never in a tracked file. An editor started from a desktop menu may not see the shell's variables; the same three lines, without `export`, in `.devcontainer/.env` are read as a fallback. The image build takes the proxy from the `build.args` of `devcontainer.json`, as diop-forge does, and never from Compose: rootless Podman runs the build's steps on the host's network, where a container-only address such as `host.containers.internal` has no route.
 
 Pulling the base images goes through the Docker daemon, which has its own proxy setting: Docker Desktop's *Resources, Proxies*, or the daemon's `proxies` in `/etc/docker/daemon.json`.
 
@@ -261,7 +261,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 | Bench lifecycle | Nothing | The table above |
 | Services | MariaDB, Redis. Mailpit and Postgres commented out | MariaDB, Redis, Mailpit, S3, Keycloak with a dev realm imported, LiteLLM. Postgres dropped |
 | Credentials | Host `~/.ssh` bind-mounted | Host `~/.gitconfig`, `~/.ssh/allowed_signers` and `~/.npmrc` copied in on every start, `~/.config/gh` mounted, ssh through the forwarded agent |
-| Proxy | Nothing | Host `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` passed to the build and the containers, empty when unset |
+| Proxy | Nothing | Host `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` passed to the containers, empty when unset; the build's proxy comes from `devcontainer.json` |
 | Windows | Nothing | `init-env.sh` runs under WSL2 or Git Bash, and no host file is mounted by an absolute path |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
 | Claude Code | Nothing | Installed, with the host `~/.claude` shared |
