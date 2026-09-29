@@ -33,6 +33,13 @@ ARG GITLEAKS_VERSION=8.30.1
 ARG GITLEAKS_SHA256_AMD64=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
 ARG GITLEAKS_SHA256_ARM64=e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080
 
+# lazygit, a terminal UI for git, aliased `lg` in custom.zsh. Fetched the same
+# way as gh. Digests from
+# https://github.com/jesseduffield/lazygit/releases/download/v<version>/checksums.txt
+ARG LAZYGIT_VERSION=0.65.1
+ARG LAZYGIT_SHA256_AMD64=02beacbcda0fa342e50ae3480ba8147307353af3fb28e1d5f790e02329c201a6
+ARG LAZYGIT_SHA256_ARM64=49abecdf6adf4f2dfdb11bf7b9bfada267ea523612ed809d1c6d87f6c04000a7
+
 USER root
 
 #   jq        reads apps.json in get-apps.sh
@@ -89,6 +96,21 @@ RUN arch="$(dpkg --print-architecture)" \
     && echo "${sha}  /tmp/${tarball}" | sha256sum -c - \
     && tar -xzf "/tmp/${tarball}" --no-same-owner -C /usr/local/bin gitleaks \
     && chmod 0755 /usr/local/bin/gitleaks \
+    && rm -f "/tmp/${tarball}"
+
+# lazygit names its amd64 build x86_64.
+RUN arch="$(dpkg --print-architecture)" \
+    && case "${arch}" in \
+    amd64) asset=x86_64; sha="${LAZYGIT_SHA256_AMD64}" ;; \
+    arm64) asset=arm64; sha="${LAZYGIT_SHA256_ARM64}" ;; \
+    *) echo "lazygit: unsupported architecture ${arch}" >&2; exit 1 ;; \
+    esac \
+    && tarball="lazygit_${LAZYGIT_VERSION}_linux_${asset}.tar.gz" \
+    && curl -fsSL -o "/tmp/${tarball}" \
+    "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/${tarball}" \
+    && echo "${sha}  /tmp/${tarball}" | sha256sum -c - \
+    && tar -xzf "/tmp/${tarball}" --no-same-owner -C /usr/local/bin lazygit \
+    && chmod 0755 /usr/local/bin/lazygit \
     && rm -f "/tmp/${tarball}"
 
 # GitHub's host keys, system-wide, so the first clone over ssh does not stop at

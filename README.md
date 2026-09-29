@@ -202,7 +202,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 | | Upstream | Here |
 |---|---|---|
-| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `jq`, `bat`, `fzf`. Every other image pinned to a release |
+| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `lazygit`, `jq`, `bat`, `fzf`. Every other image pinned to a release |
 | Passwords | `123`, hardcoded in three places | Generated per install into `.env` |
 | Apps | `installer.py`, honoured only at `bench init` | `apps.json` + `get-apps.sh`, which works on an existing bench |
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |
