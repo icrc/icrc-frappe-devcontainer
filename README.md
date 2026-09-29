@@ -145,7 +145,7 @@ All in `development/`, all with `--help`, all aliased in the shell.
 | Script | Alias | Does |
 |---|---|---|
 | `install-bench.sh` | | Create the bench and install the apps. Run once |
-| `get-apps.sh` | `frapps` | Install any app in `apps.json` not yet in the bench |
+| `get-apps.sh` | `frapps` | Install any app in `apps.json` not yet in the bench, and the pre-commit hooks of every app declared there |
 | `new-app.sh` | `frnewapp` | Scaffold an app with `bench new-app` on a feature branch of an existing repository |
 | `create-site.sh` | | Create a site and install apps into it |
 | `delete-site.sh` | | Drop a site, its database and its files |
@@ -184,7 +184,7 @@ Rotating invalidates the database the old password created. `init-env.sh --help`
 
 ### Secret scanning
 
-[betterleaks](https://github.com/betterleaks/betterleaks), the successor to gitleaks by the same author, checks every commit twice. In the container, a pre-commit hook scans what is staged and refuses the commit on a finding. On GitHub, the `betterleaks` workflow scans the commits a pull request adds, so a commit made with `--no-verify` or outside the container is still caught. Both cover this repository only, not the app checkouts under `frappe-bench/apps/`.
+[betterleaks](https://github.com/betterleaks/betterleaks), the successor to gitleaks by the same author, checks every commit twice. In the container, a pre-commit hook scans what is staged and refuses the commit on a finding. On GitHub, the `betterleaks` workflow scans the commits a pull request adds, so a commit made with `--no-verify` or outside the container is still caught. Both cover this repository only, not the app checkouts under `frappe-bench/apps/`. An app that ships its own `.pre-commit-config.yaml`, with betterleaks in it or not, gets those hooks installed by `get-apps.sh`, which also wires them into an app cloned before.
 
 The hook is installed when the container is created. In a container created before it existed, run `pre-commit install` once. A false positive is silenced with a `betterleaks:allow` comment on the line, which a reviewer then sees; `gitleaks:allow` is still honoured. A false positive already committed, which no comment can reach, is listed by fingerprint in `.betterleaksignore`.
 
