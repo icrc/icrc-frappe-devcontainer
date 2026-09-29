@@ -142,6 +142,10 @@ RUN chsh -s /bin/zsh frappe \
     && chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config \
     /home/frappe/.gitconfig
 
+# devpod's git credentials server runs `su frappe -c git config` from /root, and
+# git 2.55 dies when it cannot stat /root/.git. Search-only (711), no listing.
+RUN chmod 0711 /root
+
 USER frappe
 
 # The Python and Node the bench runs on, those of frappe/build at
