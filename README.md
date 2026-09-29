@@ -112,6 +112,15 @@ Add an entry, run `./get-apps.sh`, and only the new app is fetched. `apps-exampl
 
 bench clones one commit deep, which is all a dependency needs. For an app you develop on, add `"history": true` to its entry and the full history is fetched right after the clone, so `git log`, `blame` and a rebase work in `frappe-bench/apps/<name>`. That checkout is a normal git repository on the declared branch: work from there, and `repo-status.sh` shows where each one stands.
 
+To start a new app in a repository that already exists, with at least a first commit:
+
+```bash
+./new-app.sh my_app https://github.com/your-org/my_app.git          # commit only
+./new-app.sh --push my_app https://tfs.example.org/Coll/Proj/_git/my_app
+```
+
+It runs `bench new-app --no-git`, puts the scaffold on `feat/init-my_app` cut from the remote's default branch, keeps any file the repository has that the scaffold does not, and asks before replacing one both have. The result is one commit to merge through a pull request. Then declare the app in `apps.json`, or `apps.local.json` for an internal host.
+
 Nothing in this repository authenticates to a git host, which is what lets the same file reach any of them:
 
 ```jsonc
@@ -127,7 +136,7 @@ Nothing in this repository authenticates to a git host, which is what lets the s
   "branch": "main" }
 ```
 
-A private repository on a public host can go in `apps.json`, provided everyone using this repository can reach it (a clone that fails stops `install-bench.sh`). Keep in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores, what must not be published: an internal host such as an on-premises Azure DevOps, and your personal additions. The ICRC Protection apps will live in [icrc-prot-ecosystem](https://github.com/icrc/icrc-prot-ecosystem); until that is published, list them there.
+A private repository on a public host can go in `apps.json`, provided everyone using this repository can reach it (a clone that fails stops `install-bench.sh`). Keep in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores, what must not be published: an internal host such as an on-premises Azure DevOps, and your personal additions. It is read first, so an entry there for an app `apps.json` also declares, by the same repository name, replaces the shared one: that is how you take an app from your fork or another branch without touching the team's list. Both files matter only when an app is first fetched; `switch-version.sh` moves one already in the bench. The core ICRC Protection app lives in [frappe_prot_ucm_core](https://github.com/icrc/frappe_prot_ucm_core).
 
 ## The scripts
 
@@ -137,6 +146,7 @@ All in `development/`, all with `--help`, all aliased in the shell.
 |---|---|---|
 | `install-bench.sh` | | Create the bench and install the apps. Run once |
 | `get-apps.sh` | `frapps` | Install any app in `apps.json` not yet in the bench |
+| `new-app.sh` | `frnewapp` | Scaffold an app with `bench new-app` on a feature branch of an existing repository |
 | `create-site.sh` | | Create a site and install apps into it |
 | `delete-site.sh` | | Drop a site, its database and its files |
 | `start.sh` | `frstart` | Run the development server |

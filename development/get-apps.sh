@@ -49,6 +49,10 @@ true fetches it right after the clone.
 
 apps.local.json has the same shape and is gitignored. An internal host and
 your personal additions belong there, so neither turns into a public commit.
+It is read first: an entry for an app apps.json also declares, the same
+repository name, replaces that entry, to take it from a fork or another
+branch. Either file matters only when an app is first fetched; to move one
+already in the bench, use switch-version.sh.
 
 Exit status: 0 when every app is present at the end, 1 on a bad argument or a
 malformed file, 2 when an app could not be fetched.
@@ -85,15 +89,18 @@ done
 command -v jq >/dev/null || error_exit "jq is not installed. It is in the Dockerfile, so rebuild the container."
 require_bench
 
-# Both files, concatenated. A local entry for an app already in apps.json is
-# harmless: the first one wins, because the second finds the app present.
+# Both files, concatenated, the local one first. When both declare an app, the
+# first entry wins, because the second finds the app present: so a local entry
+# overrides the shared one, to take an app from a fork or another branch.
 read_entries() {
     local file
-    for file in "$APPS_FILE" "$LOCAL_APPS_FILE"; do
+    for file in "$LOCAL_APPS_FILE" "$APPS_FILE"; do
         [[ -n $file && -f $file ]] || continue
         jq -e 'type == "array"' "$file" >/dev/null 2>&1 ||
             error_exit "$file is not a JSON array of {url, branch}."
-        jq -r '.[] | [.url, (.branch // ""), (.history // false)] | @tsv' "$file"
+        # \u001f, not a tab: read collapses consecutive tabs, so an empty branch
+        # would shift "history" into its place.
+        jq -r '.[] | [.url, (.branch // ""), (.history // false | tostring)] | join("\u001f")' "$file"
     done
 }
 
@@ -115,9 +122,18 @@ entries="$(read_entries)"
 cd "$BENCH_DIR"
 
 failed=0
-while IFS=$'\t' read -r url branch history; do
+declare -A seen=()
+while IFS=$'\x1f' read -r url branch history; do
     [[ -n $url ]] || continue
     app="$(app_name_from_url "$url")"
+
+    # Once per app, so a dry run shows only the entry that wins, and a failed
+    # local fetch is reported rather than quietly replaced by the shared one.
+    if [[ -n ${seen[$app]:-} ]]; then
+        log_info "$app is also in $APPS_FILE, the entry in $LOCAL_APPS_FILE wins."
+        continue
+    fi
+    seen[$app]=1
 
     if [[ -d "apps/$app" ]]; then
         log_info "$app is already in the bench, skipping."
