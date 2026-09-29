@@ -127,10 +127,20 @@ RUN ssh-keyscan -t ed25519,ecdsa,rsa github.com >/tmp/github.keys 2>/dev/null \
 # The workspace and the Claude config directory, created here so a volume
 # mounted over either arrives frappe-owned: Docker initialises a fresh volume
 # from the image content at its target, ownership included, and creates it
-# root-owned when that target is missing.
+# root-owned when that target is missing. ~/.ssh likewise, for the
+# allowed_signers file docker-compose.yml mounts into it.
+#
+# ~/.gitconfig is the container's own, writable, and includes the host's,
+# mounted read-only at ~/.gitconfig-host. What the editor or devpod writes
+# goes after the include, so it overrides the host's value and stays in the
+# container instead of landing in the host file. Appended, so anything
+# frappe/bench puts there is kept.
 RUN chsh -s /bin/zsh frappe \
     && mkdir -p /workspace /home/frappe/.claude/plugins /home/frappe/.config/gh \
-    && chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config
+    && install -d -m 0700 -o frappe -g frappe /home/frappe/.ssh \
+    && printf '[include]\n\tpath = /home/frappe/.gitconfig-host\n' >>/home/frappe/.gitconfig \
+    && chown -R frappe:frappe /workspace /home/frappe/.claude /home/frappe/.config \
+    /home/frappe/.gitconfig
 
 USER frappe
 

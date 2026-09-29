@@ -2,15 +2,22 @@
 # =============================================================================
 # Prepare the HOST for the dev container (initializeCommand).
 #
-# Two jobs, both of which have to happen before the container is created:
+# Three jobs, all of which have to happen before the container is created:
 #
 #  1. .devcontainer/.env, with a freshly generated value for every secret, the
 #     Frappe pins, and an empty line per model-provider key for LiteLLM.
 #     Compose reads it when it creates the services, which is earlier than any
 #     hook running inside the container could write it.
-#  2. The bind-mount sources devcontainer.json declares. A bind mount whose
-#     source is missing aborts container creation, and Docker would create a
-#     directory where a file is expected.
+#  2. Copies of the host files the container needs, ~/.gitconfig,
+#     ~/.ssh/allowed_signers and ~/.npmrc, next to this script. Compose mounts the copies by
+#     a relative path, which needs no ${localEnv:HOME} and so works on Windows,
+#     and a copy cannot go stale the way a bind-mounted file does when the
+#     host rewrites it.
+#  3. The bind-mount directories devcontainer.json declares. A bind mount whose
+#     source is missing aborts container creation.
+#
+# Runs on macOS, Linux and Windows, the last from WSL2 or Git Bash, which is
+# what provides bash and HOME there.
 #
 # Idempotent: an existing .env is left alone, so a rebuild keeps the password
 # the existing database was created with. Pass --force to rotate it, which
@@ -45,9 +52,10 @@ usage() {
 Usage: init-env.sh [--force] [--print]
 
 Generate .devcontainer/.env with a random value per secret, render
-seaweedfs-s3.json and keycloak-realm.json from it, and create the host
-directories the container bind-mounts. Run automatically as the dev
-container's initializeCommand.
+seaweedfs-s3.json and keycloak-realm.json from it, copy ~/.gitconfig,
+~/.ssh/allowed_signers and ~/.npmrc into .devcontainer/, and create the host
+directories the container bind-mounts. Run automatically as the dev container's
+initializeCommand.
 
   --force   replace an existing .env. The database created with the old
             password becomes unreachable
@@ -181,13 +189,44 @@ fi
 render_s3_config
 render_realm_config
 
-# The bind-mount sources. ~/.gitconfig has to be a file, the other two
-# directories: Docker creates a root-owned directory for whichever is missing
-# and the mount then fails or shadows the wrong thing.
-[[ -f "$HOME/.gitconfig" ]] || {
-    touch "$HOME/.gitconfig"
-    echo "init-env.sh: created an empty ~/.gitconfig for the mount."
+if [[ -z ${HOME:-} ]]; then
+    echo "init-env.sh: HOME is not set on the host." >&2
+    echo "  On Windows, run from WSL2 or Git Bash, which sets it. See README.md." >&2
+    exit 1
+fi
+
+# A fresh copy on every start, empty when the host has none, so the mount
+# always has a file to map. The copy keeps the host file's mode rather than
+# 600: the container user is not remapped to the host UID, so a private file
+# would be unreadable inside for anyone whose UID is not 1000. Both copies are
+# git-ignored, and the gitconfig and npmrc ones can hold a credential.
+copy_host_file() {
+    local source="$1" target="$2" missing="$3"
+    if [[ -f $source ]]; then
+        cp -p "$source" "$target"
+    else
+        : >"$target"
+        echo "init-env.sh: no ${source/#$HOME/\~}, ${missing}."
+    fi
 }
-mkdir -p "$HOME/.config/gh" "$HOME/.claude"
+copy_host_file "$HOME/.gitconfig" "$HERE/.gitconfig.host" \
+    "git in the container has no identity"
+copy_host_file "$HOME/.ssh/allowed_signers" "$HERE/.allowed_signers.host" \
+    "git in the container cannot verify a signature"
+copy_host_file "$HOME/.npmrc" "$HERE/.npmrc.host" \
+    "npm in the container uses the public registry"
+
+# Less the host's prefix: nvm refuses to run under one, and a host path would
+# send `npm install -g` somewhere the container cannot write. Rewritten in
+# place, so the copy keeps its mode.
+if [[ -s "$HERE/.npmrc.host" ]]; then
+    npmrc="$(grep -Ev '^[[:space:]]*prefix[[:space:]]*=' "$HERE/.npmrc.host" || true)"
+    printf '%s\n' "$npmrc" >"$HERE/.npmrc.host"
+fi
+
+# The bind-mount directories. Docker creates a root-owned one for whichever is
+# missing. ~/.config/herdr holds herdr's control socket and is inert for a
+# host without herdr.
+mkdir -p "$HOME/.config/gh" "$HOME/.config/herdr" "$HOME/.claude"
 
 exit 0

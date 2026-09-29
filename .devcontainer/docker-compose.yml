@@ -9,6 +9,20 @@
 # one left behind) and every volume below has a fixed name.
 name: icrc-frappe
 
+# The proxy, from the host: the variables exported in the shell that opens the
+# container, else the same names in .env. Nothing set means every value is
+# empty, which curl, pip, npm and Python all read as no proxy, so one file
+# serves a network with a proxy and one without. NO_PROXY keeps the services
+# below off the proxy and appends the host's own list, which is where an
+# internal domain belongs: none is written here.
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
+  HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
+  NO_PROXY: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm,${NO_PROXY:-${no_proxy:-}}
+  http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
+  https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
+  no_proxy: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm,${NO_PROXY:-${no_proxy:-}}
+
 services:
   mariadb:
     image: docker.io/mariadb:11.8
@@ -83,15 +97,28 @@ services:
         # init-env.sh, the one place they are set.
         FRAPPE_PYTHON: ${FRAPPE_PYTHON:?run .devcontainer/init-env.sh}
         FRAPPE_NODE: ${FRAPPE_NODE:?run .devcontainer/init-env.sh}
+        # Docker's predefined proxy args: every RUN sees them without an ARG,
+        # and none is kept in the image, so nothing has to reset them.
+        <<: *proxy-env
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.
     userns_mode: keep-id
     command: sleep infinity
     environment:
-      - SHELL=/bin/zsh
+      <<: *proxy-env
+      SHELL: /bin/zsh
     working_dir: /workspace/development
     volumes:
       - ..:/workspace:z,cached
+      # The host's git config, allowed signers and npm config, as init-env.sh
+      # copied them on this start. Relative, so no host path is spelled out
+      # and Windows works. The gitconfig copy is included by the container's
+      # own ~/.gitconfig, which stays writable; see the Dockerfile. The npmrc
+      # is ~/.npmrc itself, read-only: npm has no include, so a registry or
+      # token is changed on the host and arrives at the next start.
+      - ./.gitconfig.host:/home/frappe/.gitconfig-host:ro
+      - ./.allowed_signers.host:/home/frappe/.ssh/allowed_signers:ro
+      - ./.npmrc.host:/home/frappe/.npmrc:ro
     ports:
       - "8000-8005:8000-8005"
       - "9000-9005:9000-9005"
@@ -127,6 +154,7 @@ services:
     volumes:
       - ./litellm-config.yaml:/app/config.yaml:ro
     environment:
+      <<: *proxy-env
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?run .devcontainer/init-env.sh}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
