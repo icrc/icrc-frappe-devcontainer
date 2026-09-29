@@ -20,6 +20,10 @@
 *.toml text eol=lf
 *.env text eol=lf
 *.zsh text eol=lf
+*.template text eol=lf
+# The git subcommand wrappers, which carry no extension. A CRLF shebang line
+# makes them fail on a Windows checkout.
+development/git-* text eol=lf
 
 # Docker/container files
 Dockerfile text eol=lf

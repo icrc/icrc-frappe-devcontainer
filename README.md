@@ -28,6 +28,30 @@ cd /workspace/development
 | Keycloak | http://localhost:8080, `http://keycloak:8080` from inside. Admin `admin`, realm `frappe` with client `frappe` and user `dev` |
 | LiteLLM | http://localhost:4000, `http://litellm:4000` from inside. OpenAI-compatible, key `LITELLM_MASTER_KEY` |
 
+## On the host
+
+The container is the same on every OS. What runs before it is created, `.devcontainer/init-env.sh`, is a bash script that reads `$HOME`, and a proxy has to be set where the container is opened from.
+
+### Windows
+
+Keep the repository inside WSL2 and **Reopen in Container** from there, which is Microsoft's own Dev Containers workflow. Otherwise install [Git for Windows](https://git-scm.com/download/win) with `bash` on `PATH`, which also sets `HOME`. Without either, `init-env.sh` stops and says so.
+
+### Behind a proxy
+
+Export the proxy in the host shell before opening the container:
+
+```bash
+export HTTP_PROXY=http://proxy.example.org:8080
+export HTTPS_PROXY=http://proxy.example.org:8080
+export NO_PROXY=localhost,127.0.0.1,.example.org
+```
+
+Compose passes them to the image build and to the `frappe` and `litellm` containers, and adds its own service names to `NO_PROXY`, so the bench reaches MariaDB, Keycloak or LiteLLM directly. Put your internal domains in the host's `NO_PROXY`, never in a tracked file. An editor started from a desktop menu may not see the shell's variables; the same three lines, without `export`, in `.devcontainer/.env` are read as a fallback.
+
+Pulling the base images goes through the Docker daemon, which has its own proxy setting: Docker Desktop's *Resources, Proxies*, or the daemon's `proxies` in `/etc/docker/daemon.json`.
+
+With no proxy, set nothing: every value is empty and every tool connects directly.
+
 ## Frappe versions
 
 Three pins in `.devcontainer/.env`, written once by `init-env.sh`:
@@ -158,8 +182,10 @@ The workflow blocks a merge only once `gitleaks` is a required status check in t
 
 ## Git and GitHub
 
-- **git** uses the ssh key from your host's agent, which the editor forwards into the container. No key is copied in and `~/.ssh` is not mounted, so clone, pull and push over ssh (to GitHub or any other host) work as they do on your machine. The only prerequisite is on the host: an agent running with your key loaded (`ssh-add`) before you reopen in the container.
+- **git** uses the ssh key from your host's agent, which the editor forwards into the container. No private key is copied in and only the public `allowed_signers` list reaches `~/.ssh`, so clone, pull and push over ssh (to GitHub or any other host) work as they do on your machine. The only prerequisite is on the host: an agent running with your key loaded (`ssh-add`) before you reopen in the container.
 - **gh** uses its own OAuth token, because an ssh key cannot authenticate an API call. Run `./gh-login.sh` once and approve the code in a browser; the token lands in the host's mounted `~/.config/gh`, so it survives every rebuild.
+- **git config** is the host's `~/.gitconfig`, copied into `.devcontainer/` by `init-env.sh` on every start and included by the container's own `~/.gitconfig`. A change made on the host arrives at the next start. `git config --global` inside the container writes the container's file and never touches the host's. The copy is git-ignored, and can hold whatever credential your host config holds.
+- **npm config** is the host's `~/.npmrc`, copied the same way and mounted read-only as the container's `~/.npmrc`, so a private registry and its token work for npm and yarn in the bench. Any `prefix` line is left out, since nvm refuses to run under one. Change it on the host; it arrives at the next start. With no host `~/.npmrc`, npm uses the public registry.
 
 An app cloned over https, like the default one in `apps.json`, can still push over ssh with one line in your host `~/.gitconfig`:
 
@@ -190,11 +216,37 @@ In a dev container, forward the agent rather than mounting `~/.ssh`, and point a
 git config user.signingkey "key::$(ssh-add -L | head -1)"
 ```
 
+To check signatures locally, as `git log --show-signature` does, git needs the list of keys you trust. On the host:
+
+```bash
+echo "you@yourmail.com $(cat ~/.ssh/id_ed25519.pub)" >>~/.ssh/allowed_signers
+git config --global gpg.ssh.allowedSignersFile '~/.ssh/allowed_signers'
+```
+
+Keep the single quotes: git expands the `~` on each machine, so the same setting finds the file on the host and in the container, where `init-env.sh` copies it on every start. It changes nothing about signing or about GitHub's Verified badge, only what a local check reports.
+
 ### Documentation
 
 - [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification)
 - [Telling Git about your signing key](https://docs.github.com/en/authentication/managing-commit-signature-verification/telling-git-about-your-signing-key#telling-git-about-your-ssh-key)
 - [Adding a new SSH key to your GitHub account](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
+
+## herdr (optional)
+
+[herdr](https://herdr.dev) shows whether the agent in each pane is working or waiting by watching the pane, which needs nothing from the container. Its Claude Code hook also reports the session id to herdr over a control socket, which the container reaches through the host's `~/.config/herdr`, mounted at `~/.herdr-host`.
+
+To opt in, run `herdr integration install claude` on the host, then enter the container from a herdr pane with:
+
+```bash
+devpod ssh <workspace> \
+  --set-env HERDR_ENV=1 \
+  --set-env HERDR_SOCKET_PATH=/home/frappe/.herdr-host/herdr.sock \
+  --set-env HERDR_PANE_ID="$HERDR_PANE_ID"
+```
+
+Without those variables the hook exits and nothing changes. `herdr integration install` writes the hook's absolute host path into `~/.claude/settings.json`, which does not exist in the container: change it to `bash "$HOME/.claude/hooks/herdr-agent-state.sh" session`, and again after a herdr update.
+
+Linux hosts only: a unix socket does not cross the VM of Docker Desktop on macOS or Windows.
 
 ## Divergence from upstream
 
@@ -208,7 +260,9 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |
 | Bench lifecycle | Nothing | The table above |
 | Services | MariaDB, Redis. Mailpit and Postgres commented out | MariaDB, Redis, Mailpit, S3, Keycloak with a dev realm imported, LiteLLM. Postgres dropped |
-| Credentials | Host `~/.ssh` bind-mounted | Host `~/.gitconfig` and `~/.config/gh` mounted, ssh through the forwarded agent |
+| Credentials | Host `~/.ssh` bind-mounted | Host `~/.gitconfig`, `~/.ssh/allowed_signers` and `~/.npmrc` copied in on every start, `~/.config/gh` mounted, ssh through the forwarded agent |
+| Proxy | Nothing | Host `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` passed to the build and the containers, empty when unset |
+| Windows | Nothing | `init-env.sh` runs under WSL2 or Git Bash, and no host file is mounted by an absolute path |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
 | Claude Code | Nothing | Installed, with the host `~/.claude` shared |
 
