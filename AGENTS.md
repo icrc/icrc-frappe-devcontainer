@@ -4,7 +4,7 @@ Guidance for coding agents working in this repository. Humans: [README.md](READM
 
 ## What this is
 
-A dev container for Frappe development. It ships no application code: the apps come from `development/apps.json` and are cloned into `development/frappe-bench/`, which is generated and git-ignored. A change here is a change to the environment, never to an app.
+A template for a Frappe development container, which projects copy with GitHub's **Use this template**. It ships no application code: the apps come from `development/apps.json`, empty here, and are cloned into `development/frappe-bench/`, which is generated and git-ignored. A change here is a change to the environment, never to an app, and reaches every project made from the template: nothing in a tracked file may be specific to one of them. A Compose project, container or volume name is derived from `PROJECT_NAME`, which `init-env.sh` writes into `.env`, never fixed.
 
 ## Layout
 
@@ -45,5 +45,6 @@ cd /workspace/development
 
 - A new script: `set -euo pipefail`, source `common.sh`, a `usage()` with a `--help` case, and `require_bench` / `require_secret` where they apply. Add it to the table in README.md and to `.devcontainer/zsh/custom.zsh` if it deserves an alias.
 - Pin every version you add: an image tag, a release tarball with its sha256, an app branch in `apps.json`. A floating version makes a rebuild a different container. The one deliberate exception is the `frappe/bench:latest` base, so development meets a dependency upgrade first. The Frappe pins are `FRAPPE_VERSION`, the release installed, and `FRAPPE_PYTHON` and `FRAPPE_NODE`, the toolchain frappe/build carries at that tag. They live in `.devcontainer/.env` and nowhere else.
+- A host the container must reach goes in `.devcontainer/egress-allowlist` if it is public, and in the developer's `EGRESS_ALLOW` if it is internal. Never widen the `frappe` user's sudo or drop the firewall from `postStartCommand` to get past a blocked connection.
 - Check a shell change with `bash -n` at minimum. There is no test suite; the end-to-end check is a container rebuild, `install-bench.sh`, `create-site.sh`, `start.sh`, and the site loading.
 - Keep the divergence table in README.md current when you change something the upstream frappe_docker example does differently. That table is how anyone tells our decisions from theirs.

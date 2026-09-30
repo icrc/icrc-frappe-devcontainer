@@ -3,7 +3,7 @@
 // folder is one level inside the mount.
 // Docs: https://containers.dev/implementors/json_reference/
 {
-    "name": "ICRC Frappe Bench",
+    "name": "Frappe Bench",
     "dockerComposeFile": "./docker-compose.yml",
     "service": "frappe",
     "workspaceFolder": "/workspace/development",
@@ -51,6 +51,9 @@
     //    away history or a pip cache. ~/.local is deliberately not one:
     //    frappe/bench installs bench there, and a volume would hide the
     //    image's copy behind a stale one.
+    //  The last three are declared in docker-compose.yml, which names them
+    //  from PROJECT_NAME: a name fixed here would be shared by every project
+    //  made from this template.
     //
     // ssh keys are deliberately absent, the public allowed_signers list aside:
     // the host's agent is forwarded by the editor, which authenticates a git
@@ -60,10 +63,7 @@
     "mounts": [
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/gh,target=/home/frappe/.config/gh",
         "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.claude,target=/home/frappe/.claude,consistency=cached",
-        "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/herdr,target=/home/frappe/.herdr-host",
-        "source=icrc-frappe-claude-plugins,target=/home/frappe/.claude/plugins,type=volume",
-        "source=icrc-frappe-history,target=/commandhistory,type=volume",
-        "source=icrc-frappe-cache,target=/home/frappe/.cache,type=volume"
+        "type=bind,source=${localEnv:HOME}${localEnv:USERPROFILE}/.config/herdr,target=/home/frappe/.herdr-host"
     ],
     // No forwardPorts: Compose publishes every port on the host already, and
     // forwarding one as well makes the editor bind it a second time, which
@@ -107,9 +107,11 @@
     // is non-fatal: a container that comes up without them is still a working
     // bench, and CI runs the same scan on every pull request.
     "postCreateCommand": "npm install -g @anthropic-ai/claude-code@latest || true; python3 -m pip install --user --no-cache-dir pre-commit && python3 -m pre_commit install || true",
-    // Fill the plugin volume mounted above, which starts empty on a rebuild.
-    // Idempotent and non-fatal, and runs after claude is installed.
-    "postStartCommand": "bash /workspace/.devcontainer/install-plugins.sh",
+    // Firewall first, on every start, since iptables state does not survive a
+    // restart. Then fill the plugin volume mounted above, which starts empty
+    // on a rebuild: idempotent and non-fatal, and runs after claude is
+    // installed. A firewall that fails stops here, so it cannot go unnoticed.
+    "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && bash /workspace/.devcontainer/install-plugins.sh",
     "customizations": {
         "vscode": {
             "settings": {

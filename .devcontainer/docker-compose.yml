@@ -6,22 +6,27 @@
 # The project name applies to a plain `docker compose up`. DevPod overrides it
 # with its own `--project-name`, whose hash changes between runs, so no service
 # sets container_name (a new project would clash with the containers the last
-# one left behind) and every volume below has a fixed name.
-name: icrc-frappe
+# one left behind) and every volume below has a fixed name. Fixed per project,
+# not per template: PROJECT_NAME is written to .env by init-env.sh from the
+# repository's name, so two projects made from this template on one machine
+# never open each other's database.
+name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}
 
 # The runtime proxy, from the host: the variables exported in the shell that
 # opens the container, else the same names in .env. Nothing set means every
 # value is empty, which curl, pip, npm and Python all read as no proxy, so one
 # file serves a network with a proxy and one without. NO_PROXY keeps the services
-# below off the proxy and appends the host's own list, which is where an
-# internal domain belongs: none is written here.
+# below off the proxy and is hardcoded: the host's own NO_PROXY may be `*` so
+# that devpod itself goes direct, and copied here it would send every request
+# in the container past the proxy. A project made from this
+# template adds its internal domains to both lists, e.g. `,.example.org`.
 x-proxy-env: &proxy-env
   HTTP_PROXY: ${HTTP_PROXY:-${http_proxy:-}}
   HTTPS_PROXY: ${HTTPS_PROXY:-${https_proxy:-}}
-  NO_PROXY: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm,${NO_PROXY:-${no_proxy:-}}
+  NO_PROXY: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm
   http_proxy: ${HTTP_PROXY:-${http_proxy:-}}
   https_proxy: ${HTTPS_PROXY:-${https_proxy:-}}
-  no_proxy: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm,${NO_PROXY:-${no_proxy:-}}
+  no_proxy: localhost,127.0.0.1,mariadb,redis-cache,redis-queue,mailpit,seaweedfs,keycloak,litellm
 
 services:
   mariadb:
@@ -97,17 +102,28 @@ services:
         # init-env.sh, the one place they are set.
         FRAPPE_PYTHON: ${FRAPPE_PYTHON:?run .devcontainer/init-env.sh}
         FRAPPE_NODE: ${FRAPPE_NODE:?run .devcontainer/init-env.sh}
-        # No proxy here: the build takes it from devcontainer.json, as
-        # diop-forge does. Rootless Podman runs the RUN steps in the host's
-        # network, where a container-only address such as
-        # host.containers.internal has no route.
+        # No proxy here: the build takes it from devcontainer.json.
+        # Rootless Podman runs the RUN steps in the host's network, where a
+        # container-only address such as host.containers.internal has no
+        # route.
     # Rootless Podman: keep the host UID so the bind-mounted workspace stays
     # writable. Harmless under Docker.
     userns_mode: keep-id
-    command: sleep infinity
+    # The egress firewall's iptables rules, which postStartCommand applies
+    # through the frappe user's one sudo entry. See init-firewall.sh.
+    cap_add:
+      - NET_ADMIN
+    # Podman gives an added capability to a non-root user as ambient, so PID 1
+    # would hold NET_ADMIN, and a process holding a capability hides its environ
+    # from one that does not, init-firewall.sh's read. It needs none: drop them.
+    command: setpriv --inh-caps=-all --ambient-caps=-all sleep infinity
     environment:
       <<: *proxy-env
       SHELL: /bin/zsh
+      # Hosts the firewall opens on top of egress-allowlist, host[:port],
+      # comma- or space-separated: internal ones, which no tracked file names.
+      # From the host shell, else .env, as the proxy.
+      EGRESS_ALLOW: ${EGRESS_ALLOW:-}
     working_dir: /workspace/development
     volumes:
       - ..:/workspace:z,cached
@@ -120,6 +136,14 @@ services:
       - ./.gitconfig.host:/home/frappe/.gitconfig-host:ro
       - ./.allowed_signers.host:/home/frappe/.ssh/allowed_signers:ro
       - ./.npmrc.host:/home/frappe/.npmrc:ro
+      # Claude Code's plugins, shell history and ~/.cache, here rather than in
+      # devcontainer.json so their names come from PROJECT_NAME too; see the
+      # mounts there for why each one is a volume. The plugins one lies inside
+      # the ~/.claude that devcontainer.json binds, which works whatever the
+      # order: the engine mounts a parent before what is inside it.
+      - claude-plugins:/home/frappe/.claude/plugins
+      - command-history:/commandhistory
+      - home-cache:/home/frappe/.cache
     ports:
       - "8000-8005:8000-8005"
       - "9000-9005:9000-9005"
@@ -163,15 +187,22 @@ services:
       AZURE_API_BASE: ${AZURE_API_BASE:-}
       AZURE_API_VERSION: ${AZURE_API_VERSION:-}
 
-# Named outright, so the data survives a change of project name; not external,
-# so a clean machine needs no `docker volume create` before the first start.
-# Compose warns when a later project picks one up; the warning is harmless.
+# Named outright from PROJECT_NAME, so the data survives DevPod's change of
+# project name; not external, so a clean machine needs no `docker volume create`
+# before the first start. Compose warns when a later project picks one up; the
+# warning is harmless.
 volumes:
   mariadb-data:
-    name: icrc-frappe_mariadb-data
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_mariadb-data
   mailpit-data:
-    name: icrc-frappe_mailpit-data
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_mailpit-data
   seaweedfs-data:
-    name: icrc-frappe_seaweedfs-data
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_seaweedfs-data
   keycloak-data:
-    name: icrc-frappe_keycloak-data
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_keycloak-data
+  claude-plugins:
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_claude-plugins
+  command-history:
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_history
+  home-cache:
+    name: ${PROJECT_NAME:?run .devcontainer/init-env.sh}_cache

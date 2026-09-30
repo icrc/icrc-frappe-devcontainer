@@ -48,8 +48,14 @@ USER root
 #   micro     the editor EDITOR names below
 #   bat       syntax-highlighted cat, aliased in custom.zsh
 #   zstd      restoring a bench backup compressed with it
-#   iproute2  ss, which stop-bench.sh uses to find what holds a port
+#   iproute2  ss, which stop-bench.sh uses to find what holds a port, and
+#             ip, which init-firewall.sh reads the Compose network from
+#   iptables  the egress firewall, init-firewall.sh
 #   fzf       loaded by the oh-my-zsh plugin below
+#   ripgrep   `rg`, which Claude Code uses instead of its bundled copy
+#             (USE_BUILTIN_RIPGREP=0 below), being faster
+#   fd-find   Debian names the binary `fdfind`, so `fd` is symlinked
+#   tree      directory listings
 # build-essential, curl, git, less, sudo and wget are already in frappe/bench.
 #
 # The slim base excludes /usr/share/doc/* from every package, and that is where
@@ -60,15 +66,20 @@ RUN printf 'path-include /usr/share/doc/fzf/*\n' > /etc/dpkg/dpkg.cfg.d/fzf \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     bat \
+    fd-find \
     fzf \
     gnupg \
     iproute2 \
+    iptables \
     jq \
     lsb-release \
     micro \
     procps \
+    ripgrep \
+    tree \
     zsh \
     zstd \
+    && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN arch="$(dpkg --print-architecture)" \
@@ -157,19 +168,29 @@ USER frappe
 # build when frappe/bench already has that exact release. The names are not
 # PYTHON_VERSION and NODE_VERSION: frappe/bench sets both with ENV, which
 # would silently win over a build arg of the same name.
+#
+# ast-grep-cli, structural code search as `ast-grep` and `sg`, goes into that
+# Python too: frappe/bench has no system pip. The pinned wheel is the upstream
+# release binary, hash-checked by pip, with no per-architecture download to
+# maintain. pyenv's shims find it because FRAPPE_PYTHON comes first in global.
 ARG FRAPPE_PYTHON
 ARG FRAPPE_NODE
+ARG AST_GREP_VERSION=0.45.3
 RUN pyenv install -s "${FRAPPE_PYTHON}" \
     && PYENV_VERSION="${FRAPPE_PYTHON}" pip install --no-cache-dir virtualenv \
+    "ast-grep-cli==${AST_GREP_VERSION}" \
     && pyenv global "${FRAPPE_PYTHON}" "${PYTHON_VERSION_PREV}" \
     && . "${NVM_DIR}/nvm.sh" \
     && nvm install "${FRAPPE_NODE}" \
     && npm install -g yarn \
     && nvm alias default "${FRAPPE_NODE}" \
     && nvm use default \
-    && rm -rf "${NVM_DIR}/.cache"
+    && rm -rf "${NVM_DIR}/.cache" \
+    && pyenv rehash
 
 ENV SHELL=/bin/zsh
+
+ENV USE_BUILTIN_RIPGREP=0
 
 # frappe/bench exports this from ~/.bashrc, which zsh never reads. Here it
 # reaches every process, the scripts in development/ included.
@@ -196,3 +217,26 @@ ENV CLAUDE_CONFIG_DIR=/home/frappe/.claude
 # custom.zsh. APPENDED, never prepended: the directory is a bind mount the
 # developer writes, and it must not shadow anything in /usr/local/bin.
 ENV PATH="${PATH}:/workspace/development"
+
+# The egress firewall, and sudo cut down to it. frappe/bench gives the frappe
+# user sudo for everything, which would let any process in the container flush
+# the rules; what is left is the one entry that applies them.
+# Last, so nothing above loses a sudo it needs, and so an allowlist change
+# rebuilds this layer alone. The build fails if a wider entry survives: a base
+# image that grants sudo another way must not pass unnoticed.
+USER root
+COPY init-firewall.sh /usr/local/bin/init-firewall.sh
+COPY egress-allowlist /etc/icrc-egress-allowlist
+RUN command -v setpriv >/dev/null \
+    && chmod 0755 /usr/local/bin/init-firewall.sh \
+    && chmod 0644 /etc/icrc-egress-allowlist \
+    && sed -i '/^frappe[[:space:]]/d' /etc/sudoers \
+    && grep -rl '^frappe[[:space:]]' /etc/sudoers.d | xargs -r rm -f \
+    && (gpasswd -d frappe sudo 2>/dev/null || true) \
+    && printf 'frappe ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh\n' >/etc/sudoers.d/frappe-firewall # betterleaks:allow sudoers rule, no secret
+# Its own RUN, since the line above has to end on the allow comment.
+RUN chmod 0440 /etc/sudoers.d/frappe-firewall \
+    && visudo -c \
+    && sudo -l -U frappe | grep -q '/usr/local/bin/init-firewall.sh' \
+    && ! sudo -l -U frappe | grep -Eq '(NOPASSWD: *|\) *)ALL$'
+USER frappe

@@ -1,12 +1,12 @@
-# icrc-frappe-devcontainer
+# icrc-frappe-devcontainer-template
 
 > Under construction: things can change without notice. Contributions go through pull requests, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-A dev container for Frappe: MariaDB, Redis, a mail catcher, an S3 store, Keycloak and a LiteLLM proxy, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
+A template for a Frappe dev container: MariaDB, Redis, a mail catcher, an S3 store, Keycloak and a LiteLLM proxy, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
 
 ## Quick start
 
-1. Install Docker (or Podman) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers), then open this repository and **Reopen in Container**. Passwords are generated on first start, so there is nothing to copy or fill in.
+1. Install Docker (or Podman) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). Create your repository with **Use this template** on GitHub, then open it and **Reopen in Container**. Passwords are generated on first start, so there is nothing to copy or fill in. [Using this template](#using-this-template) lists what to adapt.
 2. In the container terminal:
 
 ```bash
@@ -28,6 +28,23 @@ cd /workspace/development
 | Keycloak | http://localhost:8080, `http://keycloak:8080` from inside. Admin `admin`, realm `frappe` with client `frappe` and user `dev` |
 | LiteLLM | http://localhost:4000, `http://litellm:4000` from inside. OpenAI-compatible, key `LITELLM_MASTER_KEY` |
 
+## Using this template
+
+**Use this template** on GitHub gives your repository a copy of the files without this one's history. It works as it is, with a bench of Frappe alone; what makes it yours:
+
+| Where | What |
+|---|---|
+| `development/apps.json` | Your apps. It ships empty; `apps-example.json` has entries to copy, and [Choosing the apps](#choosing-the-apps) the rest |
+| `PROJECT_NAME` in `.devcontainer/.env` | The Compose project and the prefix of every volume, written on first start from your repository's name (`icrc-frappe-template` for this one), so two projects made from this template on one machine never share a database. Changing it later starts the stack on new, empty volumes |
+| `FRAPPE_VERSION`, `FRAPPE_PYTHON`, `FRAPPE_NODE` in `.devcontainer/.env` | The release your production image runs, see [Frappe versions](#frappe-versions) |
+| `NO_PROXY` and `no_proxy` in `.devcontainer/docker-compose.yml` | Your internal domains, if you work behind a proxy |
+| `.devcontainer/egress-allowlist` | The public hosts your apps reach that the list does not open yet |
+| `"name"` in `.devcontainer/devcontainer.json` | What the editor shows for the container |
+| `.github/CODEOWNERS` | Your team, in place of this repository's |
+| `README.md` | Your title and introduction. The rest describes the container and stays true |
+
+Every generated file, `.env` among them, is git-ignored, so none of it reaches your repository.
+
 ## On the host
 
 The container is the same on every OS. What runs before it is created, `.devcontainer/init-env.sh`, is a bash script that reads `$HOME`, and a proxy has to be set where the container is opened from.
@@ -43,14 +60,27 @@ Export the proxy in the host shell before opening the container:
 ```bash
 export HTTP_PROXY=http://proxy.example.org:8080
 export HTTPS_PROXY=http://proxy.example.org:8080
-export NO_PROXY=localhost,127.0.0.1,.example.org
 ```
 
-Compose passes them to the `frappe` and `litellm` containers, and adds its own service names to `NO_PROXY`, so the bench reaches MariaDB, Keycloak or LiteLLM directly. Put your internal domains in the host's `NO_PROXY`, never in a tracked file. An editor started from a desktop menu may not see the shell's variables; the same three lines, without `export`, in `.devcontainer/.env` are read as a fallback. The image build takes the proxy from the `build.args` of `devcontainer.json`, as diop-forge does, and never from Compose: rootless Podman runs the build's steps on the host's network, where a container-only address such as `host.containers.internal` has no route.
+Compose passes them to the `frappe` and `litellm` containers, whose `NO_PROXY` is hardcoded to its own service names, so the bench reaches MariaDB, Keycloak or LiteLLM directly. The host's `NO_PROXY` is not copied: a launcher may set it to `*` so that devpod goes direct, which would send every request in the container past the proxy. A project made from this template adds its internal domains to `NO_PROXY` and `no_proxy` in `.devcontainer/docker-compose.yml`. An editor started from a desktop menu may not see the shell's variables; the same two lines, without `export`, in `.devcontainer/.env` are read as a fallback. The image build takes the proxy from the `build.args` of `devcontainer.json`, and never from Compose: rootless Podman runs the build's steps on the host's network, where a container-only address such as `host.containers.internal` has no route.
 
 Pulling the base images goes through the Docker daemon, which has its own proxy setting: Docker Desktop's *Resources, Proxies*, or the daemon's `proxies` in `/etc/docker/daemon.json`.
 
 With no proxy, set nothing: every value is empty and every tool connects directly.
+
+## Egress firewall
+
+Every start applies a default-deny outbound firewall, `.devcontainer/init-firewall.sh`. It opens the Compose network, GitHub, PyPI, npm and yarn, Claude Code and the VS Code marketplace, which `.devcontainer/egress-allowlist` lists, and the proxy when one is set. It works with a proxy and without one. `init-firewall.sh --help` has the detail.
+
+An internal host, such as a registry named in `~/.npmrc`, is opened with `EGRESS_ALLOW` on the host, set as the proxy is and never in a tracked file:
+
+```bash
+export EGRESS_ALLOW=git.example.org,registry.example.org:8443
+```
+
+A public host the whole team needs goes in `egress-allowlist`, and takes a rebuild. Names are resolved once, at start, so if a host behind a CDN stops answering after a while, run `sudo /usr/local/bin/init-firewall.sh` again.
+
+`./net-check.sh` checks it all in a few seconds: the proxy, the Compose services, a few allowed hosts, and that anything else is still blocked.
 
 ## Frappe versions
 
@@ -100,7 +130,7 @@ The fix belongs in the production image build, not here: stamp the commit into `
 
 ## Choosing the apps
 
-`development/apps.json` is the list, in the shape `bench` itself uses:
+`development/apps.json` is the list, in the shape `bench` itself uses. The template ships it empty, so the bench holds Frappe alone until you add an entry:
 
 ```json
 [
@@ -136,7 +166,7 @@ Nothing in this repository authenticates to a git host, which is what lets the s
   "branch": "main" }
 ```
 
-A private repository on a public host can go in `apps.json`, provided everyone using this repository can reach it (a clone that fails stops `install-bench.sh`). Keep in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores, what must not be published: an internal host such as an on-premises Azure DevOps, and your personal additions. It is read first, so an entry there for an app `apps.json` also declares, by the same repository name, replaces the shared one: that is how you take an app from your fork or another branch without touching the team's list. Both files matter only when an app is first fetched; `switch-version.sh` moves one already in the bench. The core ICRC Protection app lives in [frappe_prot_ucm_core](https://github.com/icrc/frappe_prot_ucm_core).
+A private repository on a public host can go in `apps.json`, provided everyone using this repository can reach it (a clone that fails stops `install-bench.sh`). Keep in `development/apps.local.json`, which `get-apps.sh` reads too and git ignores, what must not be published: an internal host such as an on-premises Azure DevOps, and your personal additions. It is read first, so an entry there for an app `apps.json` also declares, by the same repository name, replaces the shared one: that is how you take an app from your fork or another branch without touching the team's list. Both files matter only when an app is first fetched; `switch-version.sh` moves one already in the bench.
 
 ## The scripts
 
@@ -167,7 +197,7 @@ The two git ones are git subcommands as well, completed by `git <TAB>`, so neith
 
 ## Adding a tool
 
-`sudo apt-get install PACKAGE` works in the container without a password: frappe/bench gives the `frappe` user sudo. What it installs lasts until the next rebuild. A tool the whole team needs goes in the apt list in `.devcontainer/Dockerfile` instead.
+A tool goes in the apt list in `.devcontainer/Dockerfile`, and arrives with the next rebuild. There is no `sudo apt-get` in the container: the `frappe` user's sudo is cut down to the firewall script, so that nothing in the container can take the firewall down.
 
 ## Secrets
 
@@ -197,7 +227,7 @@ The workflow blocks a merge only once `betterleaks` is a required status check i
 - **git config** is the host's `~/.gitconfig`, copied into `.devcontainer/` by `init-env.sh` on every start and included by the container's own `~/.gitconfig`. A change made on the host arrives at the next start. `git config --global` inside the container writes the container's file and never touches the host's. The copy is git-ignored, and can hold whatever credential your host config holds.
 - **npm config** is the host's `~/.npmrc`, copied the same way and mounted read-only as the container's `~/.npmrc`, so a private registry and its token work for npm and yarn in the bench. Any `prefix` line is left out, since nvm refuses to run under one. Change it on the host; it arrives at the next start. With no host `~/.npmrc`, npm uses the public registry.
 
-An app cloned over https, like the default one in `apps.json`, can still push over ssh with one line in your host `~/.gitconfig`:
+An app cloned over https, like every entry in `apps-example.json`, can still push over ssh with one line in your host `~/.gitconfig`:
 
 ```bash
 git config --global url."git@github.com:".pushInsteadOf "https://github.com/"
@@ -264,22 +294,24 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 
 | | Upstream | Here |
 |---|---|---|
-| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `lazygit`, `jq`, `bat`, `fzf`. Every other image pinned to a release |
+| Distribution | A folder inside frappe_docker, copied by hand | A GitHub template repository; `PROJECT_NAME` keeps each copy's containers and volumes apart |
+| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `lazygit`, `jq`, `bat`, `fzf`, `rg`, `fd`, `tree`, `ast-grep`. Every other image pinned to a release |
 | Passwords | `123`, hardcoded in three places | Generated per install into `.env` |
 | Apps | `installer.py`, honoured only at `bench init` | `apps.json` + `get-apps.sh`, which works on an existing bench |
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |
 | Bench lifecycle | Nothing | The table above |
 | Services | MariaDB, Redis. Mailpit and Postgres commented out | MariaDB, Redis, Mailpit, S3, Keycloak with a dev realm imported, LiteLLM. Postgres dropped |
 | Credentials | Host `~/.ssh` bind-mounted | Host `~/.gitconfig`, `~/.ssh/allowed_signers` and `~/.npmrc` copied in on every start, `~/.config/gh` mounted, ssh through the forwarded agent |
-| Proxy | Nothing | Host `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` passed to the containers, empty when unset; the build's proxy comes from `devcontainer.json` |
+| Proxy | Nothing | Host `HTTP_PROXY` and `HTTPS_PROXY` passed to the containers, `NO_PROXY` hardcoded to the services, empty when unset; the build's proxy comes from `devcontainer.json` |
+| Egress | Open, and the `frappe` user has full sudo | Default-deny firewall at every start, with or without a proxy; sudo cut down to the firewall script |
 | Windows | Nothing | `init-env.sh` runs under WSL2 or Git Bash, and no host file is mounted by an absolute path |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
 | Claude Code | Nothing | Installed, with the host `~/.claude` shared |
 
 ## Licence
 
-Copyright (C) 2026 International Committee of the Red Cross (ICRC), portions Copyright (c) 2017 Frappe Technologies Pvt. Ltd.
+Copyright (c) 2026 International Committee of the Red Cross (ICRC), portions Copyright (c) 2017 Frappe Technologies Pvt. Ltd.
 
-GNU General Public License v3.0. See [LICENSE](LICENSE).
+BSD 3-Clause License. See [LICENSE](LICENSE). A project made from this template may license its copy as it chooses, provided it keeps both notices.
 
 Portions derived from [frappe_docker](https://github.com/frappe/frappe_docker), Copyright (c) 2017 Frappe Technologies Pvt. Ltd., under the MIT licence. See [LICENSES/MIT-frappe_docker.txt](LICENSES/MIT-frappe_docker.txt).
