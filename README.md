@@ -37,7 +37,7 @@ cd /workspace/development
 | Where | What |
 |---|---|
 | `development/apps.json` | Your apps. It ships empty; `apps-example.json` has entries to copy, and [Choosing the apps](#choosing-the-apps) the rest |
-| `PROJECT_NAME` in `.devcontainer/.env` | The Compose project and the prefix of every volume, written on first start from your repository's name (`icrc-frappe-template` for this one), so two projects made from this template on one machine never share a database. Changing it later starts the stack on new, empty volumes |
+| `PROJECT_NAME` in `.devcontainer/.env` | The Compose project and the prefix of every volume, so two projects made from this template on one machine never share a database. Written on first start from your repository's name (`icrc-frappe-template` for this one), unless you choose it, see below |
 | `FRAPPE_VERSION`, `FRAPPE_PYTHON`, `FRAPPE_NODE` in `.devcontainer/.env` | The release your production image runs, see [Frappe versions](#frappe-versions) |
 | `NO_PROXY` and `no_proxy` in `.devcontainer/docker-compose.yml` | Your internal domains, if you work behind a proxy |
 | `.devcontainer/egress-allowlist` | The public hosts your apps reach that the list does not open yet |
@@ -46,6 +46,15 @@ cd /workspace/development
 | `README.md` | Your title and introduction. The rest describes the container and stays true |
 
 Every generated file, `.env` among them, is git-ignored, so none of it reaches your repository.
+
+To choose the project name, export it in the host shell before the first **Reopen in Container**, as you would the proxy, or run `init-env.sh` once on the host:
+
+```bash
+export PROJECT_NAME=acme-crm
+bash .devcontainer/init-env.sh --project-name acme-crm   # the same, without the export
+```
+
+Lower case, digits, `-` and `_`. It is written into `.env` once and read from there on every start. A `PROJECT_NAME` in the shell that contradicts `.env` stops the start with an error, because Compose would take the shell's and open another project's volumes. To rename, edit `.env`; the stack then starts on new, empty volumes and the old ones stay behind.
 
 ## On the host
 
