@@ -4,6 +4,8 @@
 
 A template for a Frappe dev container: MariaDB, Redis, a mail catcher, an S3 store, Keycloak and a LiteLLM proxy, with the bench and its apps built from a config file you edit. Based on the [frappe_docker devcontainer example](https://github.com/frappe/frappe_docker/tree/main/devcontainer-example), with the differences listed at the end.
 
+It is made for working with an AI coding agent, [Claude Code](https://docs.anthropic.com/en/docs/claude-code), installed in the container, so the agent runs there rather than on your machine. A default-deny egress firewall decides which hosts the agent, and everything else in the container, can reach, and the agent cannot change it. [Claude Code and egress control](#claude-code-and-egress-control) says what that covers and what it does not.
+
 ## Quick start
 
 1. Install Docker (or Podman) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers). Create your repository with **Use this template** on GitHub, then open it and **Reopen in Container**. Passwords are generated on first start, so there is nothing to copy or fill in. [Using this template](#using-this-template) lists what to adapt.
@@ -68,7 +70,24 @@ Pulling the base images goes through the Docker daemon, which has its own proxy 
 
 With no proxy, set nothing: every value is empty and every tool connects directly.
 
-## Egress firewall
+## Claude Code and egress control
+
+Claude Code is installed when the container is created and runs as the `frappe` user, like the bench. What it can use is what the container holds:
+
+- the repository, mounted at `/workspace`, and the bench and app checkouts under it;
+- the host's `~/.claude`, so the login and settings are the ones you have on the host. Plugins are the exception: a volume of this project's own, which `.devcontainer/install-plugins.sh` fills on every start from the marketplaces and plugins your settings declare;
+- the credentials the container is given for git: the forwarded ssh agent, the `gh` token in the mounted `~/.config/gh`, and the copies of `~/.gitconfig` and `~/.npmrc`. Wherever those authenticate, the agent can authenticate too. No private ssh key and no other host file enters the container.
+
+What it can reach on the network is decided by the firewall below, and not by the agent. Root applies the rules on every start. The `frappe` user's sudo is cut down to the one script that applies them, so neither the agent nor any other process in the container can flush them. That script reads the proxy and `EGRESS_ALLOW` from the environment the container was started with, never from its caller's, so an agent cannot open a host by setting a variable first. A host the agent needs and the list lacks is a change to a tracked file, `egress-allowlist`, which goes through review, or a decision you take on the host with `EGRESS_ALLOW`.
+
+The firewall limits where traffic goes, not what is sent there. It does not cover:
+
+- **What an allowed host accepts.** GitHub's ranges, PyPI and npm are open for anything, so an agent can push, open a gist or publish a package wherever the credentials above allow. Keep the `gh` token and the registry tokens scoped to what the work needs.
+- **DNS.** Port 53 is open to any resolver, which is a channel out for a small amount of data.
+- **The proxy.** When one is set it is opened, and what it lets through is its own policy, not this list.
+- **What the agent does inside.** It can change any file in the repository and the bench, and run anything the `frappe` user can. Review its changes as you would anyone's; the signed commits and the secret scan below apply to them too.
+
+### Egress firewall
 
 Every start applies a default-deny outbound firewall, `.devcontainer/init-firewall.sh`. It opens the Compose network, GitHub, PyPI, npm and yarn, Claude Code and the VS Code marketplace, which `.devcontainer/egress-allowlist` lists, and the proxy when one is set. It works with a proxy and without one. `init-firewall.sh --help` has the detail.
 
@@ -306,7 +325,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 | Egress | Open, and the `frappe` user has full sudo | Default-deny firewall at every start, with or without a proxy; sudo cut down to the firewall script |
 | Windows | Nothing | `init-env.sh` runs under WSL2 or Git Bash, and no host file is mounted by an absolute path |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
-| Claude Code | Nothing | Installed, with the host `~/.claude` shared |
+| Claude Code | Nothing | Installed, with the host `~/.claude` shared, and behind the egress firewall |
 
 ## Licence
 

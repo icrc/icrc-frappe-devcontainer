@@ -6,6 +6,8 @@ Guidance for coding agents working in this repository. Humans: [README.md](READM
 
 A template for a Frappe development container, which projects copy with GitHub's **Use this template**. It ships no application code: the apps come from `development/apps.json`, empty here, and are cloned into `development/frappe-bench/`, which is generated and git-ignored. A change here is a change to the environment, never to an app, and reaches every project made from the template: nothing in a tracked file may be specific to one of them. A Compose project, container or volume name is derived from `PROJECT_NAME`, which `init-env.sh` writes into `.env`, never fixed.
 
+You are probably running inside that container. Its egress firewall is what bounds an agent's network access, and README.md's "Claude Code and egress control" says what it covers. A connection it refuses is the control doing its job, not a fault to work around.
+
 ## Layout
 
 ```
