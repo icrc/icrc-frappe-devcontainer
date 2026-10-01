@@ -158,6 +158,17 @@ if [[ ! -f .gitignore ]]; then
 fi
 
 git add -A
+
+# The scaffold's own hooks, which its CI runs: bench's hooks.py ends with a
+# blank line ruff-format removes, so the first run rewrites and fails, and the
+# second, on the rewritten files, must pass.
+if [[ -f .pre-commit-config.yaml ]] && command -v pre-commit >/dev/null; then
+    log_info "Running the scaffold's pre-commit hooks."
+    pre-commit run --all-files >/dev/null 2>&1 || pre-commit run --all-files ||
+        log_warn "A pre-commit hook still fails. Fix it before the push, or CI will."
+    git add -A
+fi
+
 git commit --quiet -m "feat: initialize $APP with bench new-app" || {
     log_error "The commit failed. The scaffold is staged in $APP_DIR."
     log_error "  A signing error? Check it with: git -C $APP_DIR commit"
