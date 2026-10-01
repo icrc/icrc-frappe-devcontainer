@@ -46,6 +46,9 @@ USER root
 
 #   jq        reads apps.json in get-apps.sh
 #   micro     the editor EDITOR names below
+#   chromium  the browser agent-browser drives: Debian's, built for both
+#             architectures, rather than the Chrome for Testing download
+#             agent-browser installs unchecked and only for amd64
 #   bat       syntax-highlighted cat, aliased in custom.zsh
 #   zstd      restoring a bench backup compressed with it
 #   iproute2  ss, which stop-bench.sh uses to find what holds a port, and
@@ -66,6 +69,7 @@ RUN printf 'path-include /usr/share/doc/fzf/*\n' > /etc/dpkg/dpkg.cfg.d/fzf \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
     bat \
+    chromium \
     fd-find \
     fzf \
     gnupg \
@@ -173,20 +177,49 @@ USER frappe
 # Python too: frappe/bench has no system pip. The pinned wheel is the upstream
 # release binary, hash-checked by pip, with no per-architecture download to
 # maintain. pyenv's shims find it because FRAPPE_PYTHON comes first in global.
+#
+# agent-browser, browser automation for agents, goes into that Node: it needs
+# Node 24 or later. Pinned, and checked by npm against the registry's
+# integrity hash.
 ARG FRAPPE_PYTHON
 ARG FRAPPE_NODE
 ARG AST_GREP_VERSION=0.45.3
+ARG AGENT_BROWSER_VERSION=0.38.1
 RUN pyenv install -s "${FRAPPE_PYTHON}" \
     && PYENV_VERSION="${FRAPPE_PYTHON}" pip install --no-cache-dir virtualenv \
     "ast-grep-cli==${AST_GREP_VERSION}" \
     && pyenv global "${FRAPPE_PYTHON}" "${PYTHON_VERSION_PREV}" \
     && . "${NVM_DIR}/nvm.sh" \
     && nvm install "${FRAPPE_NODE}" \
-    && npm install -g yarn \
+    && npm install -g yarn "agent-browser@${AGENT_BROWSER_VERSION}" \
     && nvm alias default "${FRAPPE_NODE}" \
     && nvm use default \
     && rm -rf "${NVM_DIR}/.cache" \
     && pyenv rehash
+
+# Two Python CLIs, each in a virtualenv of its own so neither one's
+# dependencies reach the interpreter above, and linked into ~/.local/bin,
+# which frappe/bench puts on PATH. Pinned like ast-grep.
+#   frappectl             a client for live Frappe sites, v16 and later. With
+#                         no keyring in a container it reads FRAPPE_SITE,
+#                         FRAPPE_API_KEY and FRAPPE_API_SECRET
+#   pretty-release-notes  release notes written from a GitHub repository's
+#                         pull requests by an LLM. GitHub only
+ARG FRAPPECTL_VERSION=0.19.0
+ARG PRETTY_RELEASE_NOTES_VERSION=1.4.1
+RUN for spec in "frappectl==${FRAPPECTL_VERSION}" \
+    "pretty-release-notes==${PRETTY_RELEASE_NOTES_VERSION}"; do \
+    tool="${spec%%==*}" \
+    && venv="/home/frappe/.local/share/${tool}" \
+    && PYENV_VERSION="${FRAPPE_PYTHON}" python -m venv "${venv}" \
+    && "${venv}/bin/pip" install --no-cache-dir "${spec}" \
+    && mkdir -p /home/frappe/.local/bin \
+    && ln -sf "${venv}/bin/${tool}" "/home/frappe/.local/bin/${tool}" \
+    || exit 1; \
+    done
+
+# agent-browser drives the Debian chromium installed above.
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 
 ENV SHELL=/bin/zsh
 

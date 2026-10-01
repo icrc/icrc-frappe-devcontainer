@@ -97,6 +97,9 @@ done
 command -v jq >/dev/null || error_exit "jq is not installed. It is in the Dockerfile, so rebuild the container."
 require_bench
 
+# The bench's own AGENTS.md, which an agent reads in any app that has none.
+[[ $dry_run == true ]] || write_agents_md bench "$BENCH_DIR/AGENTS.md"
+
 # Both files, concatenated, the local one first. When both declare an app, the
 # first entry wins, because the second finds the app present: so a local entry
 # overrides the shared one, to take an app from a fork or another branch.

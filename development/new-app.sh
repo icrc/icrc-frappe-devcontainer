@@ -157,6 +157,9 @@ if [[ ! -f .gitignore ]]; then
         error_exit "Cannot write .gitignore from Frappe's template."
 fi
 
+# The agent guidance of templates/app-AGENTS.md, unless the repository has its own.
+write_agents_md app AGENTS.md "$APP"
+
 git add -A
 
 # The scaffold's own hooks, which its CI runs: bench's hooks.py ends with a

@@ -110,6 +110,26 @@ A public host the whole team needs goes in `egress-allowlist`, and takes a rebui
 
 `./net-check.sh` checks it all in a few seconds: the proxy, the Compose services, a few allowed hosts, and that anything else is still blocked.
 
+## Agent skills and tools
+
+**Skills.** `development/skills.json` pins each skill repository to a commit, and `get-skills.sh` copies its skills into `.claude/skills` at the repository root on every start, where Claude Code finds them from `development/`. That folder is git-ignored: a skill is installed, never committed, so a repository without a licence can be used but is never shipped. Pinned today:
+
+- [frappe/skills](https://github.com/frappe/skills): Frappe best practices for DocTypes, controllers, APIs, tests and the bench CLI. It has no licence yet. `/deep-app-audit` and `/draft-security-advisory` run only when called.
+- [agent-browser](https://github.com/vercel-labs/agent-browser)'s skill, which teaches the agent the tool below.
+
+To move a pin, set its `ref` to a newer commit sha and run `./get-skills.sh`.
+
+**AGENTS.md.** `get-apps.sh` writes one at the bench root, saying what a bench is, and `new-app.sh` writes one into each new app from `development/templates/app-AGENTS.md`. Both end with the [ponytail-lite](https://github.com/ilindaniel/ponytail-lite) rules: the smallest change that works. An existing file is never overwritten, so an app's AGENTS.md is the project's to edit.
+
+**Tools**, in the image:
+
+| Tool | For | Set up |
+|---|---|---|
+| `gh` | GitHub from the command line | `./gh-login.sh`, once per host |
+| `agent-browser` | Browser automation, to test a UI flow | Drives the image's Chromium, through `AGENT_BROWSER_EXECUTABLE_PATH` |
+| `frappectl` | Listing, reading and changing documents on a live Frappe site, v16 and later | `FRAPPE_SITE`, `FRAPPE_API_KEY` and `FRAPPE_API_SECRET` exported in the shell, from an API key of a site user: there is no keyring in a container. The agent can do whatever that user can, so give it the roles the work needs |
+| `pretty-release-notes` | Readable release notes from a GitHub repository's pull requests. GitHub only | `pretty-release-notes setup` writes `~/.pretty-release-notes/config.toml`, with a GitHub token and an LLM key, and a rebuild loses it. An `anthropic:` model reaches a host the firewall already opens; another provider needs its host in `EGRESS_ALLOW` |
+
 ## Frappe versions
 
 Three pins in `.devcontainer/.env`, written once by `init-env.sh`:
@@ -218,6 +238,7 @@ All in `development/`, all with `--help`, all aliased in the shell.
 | `repo-status.sh` | `frstatus`, `git repo-status` | The git state of every app checkout, in one table |
 | `pr-sync.sh` | `git pr-sync` | Return an app to its default branch once its PR is merged |
 | `gh-login.sh` | | Authenticate `gh`, once per host, with the device flow |
+| `get-skills.sh` | | Install the agent skills `skills.json` pins. Runs on every start |
 
 Navigation: `godev`, `gobench`, `goapps`, `gosites`. Log tail: `logs`.
 
@@ -323,7 +344,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 | | Upstream | Here |
 |---|---|---|
 | Distribution | A folder inside frappe_docker, copied by hand | A GitHub template repository; `PROJECT_NAME` keeps each copy's containers and volumes apart |
-| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `lazygit`, `jq`, `bat`, `fzf`, `rg`, `fd`, `tree`, `ast-grep`. Every other image pinned to a release |
+| Image | `frappe/bench:latest`, used as is | `frappe/bench:latest` too, plus GitHub's host keys, zsh, `micro`, `gh`, `lazygit`, `jq`, `bat`, `fzf`, `rg`, `fd`, `tree`, `ast-grep`, `chromium`, `agent-browser`, `frappectl`, `pretty-release-notes`. Every other image pinned to a release |
 | Passwords | `123`, hardcoded in three places | Generated per install into `.env` |
 | Apps | `installer.py`, honoured only at `bench init` | `apps.json` + `get-apps.sh`, which works on an existing bench |
 | Site | `installer.py` | `create-site.sh`, with an explicit app list |
@@ -334,7 +355,7 @@ Kept from [frappe_docker](https://github.com/frappe/frappe_docker/tree/main/devc
 | Egress | Open, and the `frappe` user has full sudo | Default-deny firewall at every start, with or without a proxy; sudo cut down to the firewall script |
 | Windows | Nothing | `init-env.sh` runs under WSL2 or Git Bash, and no host file is mounted by an absolute path |
 | Repository work | Nothing | `gh`, `repo-status.sh`, `pr-sync.sh` |
-| Claude Code | Nothing | Installed, with the host `~/.claude` shared, and behind the egress firewall |
+| Claude Code | Nothing | Installed, with the host `~/.claude` shared, and behind the egress firewall. Skills pinned in `skills.json`, and an AGENTS.md written into the bench and each new app |
 
 ## Licence
 
@@ -343,3 +364,5 @@ Copyright (c) 2026 International Committee of the Red Cross (ICRC), portions Cop
 BSD 3-Clause License. See [LICENSE](LICENSE). A project made from this template may license its copy as it chooses, provided it keeps both notices.
 
 Portions derived from [frappe_docker](https://github.com/frappe/frappe_docker), Copyright (c) 2017 Frappe Technologies Pvt. Ltd., under the MIT licence. See [LICENSES/MIT-frappe_docker.txt](LICENSES/MIT-frappe_docker.txt).
+
+`development/templates/ponytail-lite.md` is [ponytail-lite](https://github.com/ilindaniel/ponytail-lite), Copyright (c) 2026 DietrichGebert and Daniel Ilin, under the MIT licence. See [LICENSES/MIT-ponytail-lite.txt](LICENSES/MIT-ponytail-lite.txt). Every AGENTS.md written from it carries that notice.

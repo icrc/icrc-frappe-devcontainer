@@ -69,6 +69,25 @@ confirm() {
     [[ $REPLY =~ ^[Yy][Ee][Ss]$ ]]
 }
 
+# Write DEST, an AGENTS.md, from templates/KIND-AGENTS.md followed by the
+# ponytail-lite rules, with APP_NAME in the template replaced by APP. Its MIT
+# notice closes the file in a comment, since every copy must carry it. A DEST
+# that exists is left alone: it belongs to the project by then.
+write_agents_md() {
+    local kind="$1" dest="$2" app="${3:-}" templates="$DEV_DIR/templates"
+    [[ -e $dest ]] && return 0
+    {
+        sed "s/APP_NAME/$app/g" "$templates/$kind-AGENTS.md"
+        echo
+        sed 's/^#/##/' "$templates/ponytail-lite.md"
+        echo
+        echo "<!-- The section above is ponytail-lite, https://github.com/ilindaniel/ponytail-lite:"
+        echo
+        cat "$REPO_DIR/LICENSES/MIT-ponytail-lite.txt"
+        echo "-->"
+    } >"$dest"
+}
+
 require_secret() {
     local name="$1"
     [[ -n ${!name:-} ]] ||

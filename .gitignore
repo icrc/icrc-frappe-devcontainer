@@ -19,6 +19,8 @@ development/*
 # git subcommand wrappers: git demands the exact `git-<name>`, so these carry
 # no extension and the rule above would drop them.
 !development/git-*
+# The AGENTS.md written into the bench and into a new app.
+!development/templates/
 
 # A personal app list, read by get-apps.sh alongside apps.json.
 development/apps.local.json

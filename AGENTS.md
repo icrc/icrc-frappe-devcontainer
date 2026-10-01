@@ -12,7 +12,8 @@ You are probably running inside that container. Its egress firewall is what boun
 
 ```
 .devcontainer/    the container: Dockerfile, Compose services, init-env.sh
-development/      the scripts, apps.json, and (generated) frappe-bench/
+development/      the scripts, apps.json, skills.json, and (generated) frappe-bench/
+development/templates/   the AGENTS.md written into the bench and into a new app
 ```
 
 Inside the container the repository is at `/workspace` and the bench at `/workspace/development/frappe-bench`. Do not hardcode either: every script derives its paths from its own location through `development/common.sh`, which is what lets the repository be mounted anywhere.
@@ -29,6 +30,7 @@ cd /workspace/development
 ./start.sh              # the server
 ./migrate-site.sh       # after ANY DocType change
 ./repo-status.sh        # the git state of every app checkout
+./get-skills.sh         # after editing skills.json; also runs on every start
 ```
 
 ## Rules

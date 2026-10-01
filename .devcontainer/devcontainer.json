@@ -110,8 +110,10 @@
     // Firewall first, on every start, since iptables state does not survive a
     // restart. Then fill the plugin volume mounted above, which starts empty
     // on a rebuild: idempotent and non-fatal, and runs after claude is
-    // installed. A firewall that fails stops here, so it cannot go unnoticed.
-    "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && bash /workspace/.devcontainer/install-plugins.sh",
+    // installed. Then the skills development/skills.json pins, likewise
+    // idempotent and non-fatal. A firewall that fails stops here, so it cannot
+    // go unnoticed.
+    "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && bash /workspace/.devcontainer/install-plugins.sh && bash /workspace/development/get-skills.sh",
     "customizations": {
         "vscode": {
             "settings": {
