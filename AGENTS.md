@@ -41,6 +41,8 @@ cd /workspace/development
 
 **No ICRC-internal hostname, URL, project name or address anywhere.** This repository is licensed for publication. An internal example goes in `apps.local.json`, which is git-ignored, or in a placeholder form such as `tfs.example.org`.
 
+**The licence in LICENSE is chosen by ICRC when the repository is created, and is kept.** Copy third-party code in only under a licence compatible with it, with that licence's text added to `LICENSES/` and a line in README.md's Licence section. Code under an incompatible licence, or under none, is installed when the container is built or run, never committed. When compatibility is unclear, ask rather than copy.
+
 **Commits are signed**, and pull requests go through a feature branch. README.md has the ssh signing setup.
 
 ## Conventions for a change here
